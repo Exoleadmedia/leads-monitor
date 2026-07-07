@@ -50,24 +50,24 @@ sample — the sample (*"Sample data"*) only appears with no live data and no
 cache. If a load still lands on non-live while an endpoint is configured, it
 self-heals with a few quick retries instead of waiting the full 5-minute poll.
 
-The Apps Script reads **only** the daily-summary tab and the `Cumul. Leads` tab
-(HD) plus the ED monthly daily-summary tab, and parses money/percent cells to
-plain numbers server-side. It never touches the lead-level/PII tabs (including
-the ED sheet's lead-level tab). See `apps-script/Code.gs` and the build spec for
-the JSON contract.
+The Apps Script reads **only** each sheet's daily-summary (monthly) tab and its
+`Cumul. Leads` tab, and parses money/percent cells to plain numbers server-side.
+It never touches the lead-level/PII tabs (including the ED sheet's lead-level
+tab). See `apps-script/Code.gs` and the build spec for the JSON contract.
 
 The two top-of-page tiles read from this same payload and **double as a vertical
-selector** (colour-coded — HD purple, ED amber): **HD Leads** = today's
-cumulative total vs the time-of-day typical (from `today.cumulative` +
-`benchmark`), and **ED Leads** = today's whole-day total from the optional `ed`
-block (`ed.todayLeads`, with `ed.monthToDate` as context). ED has no per-hour
-data, so it shows no intraday pace. If `ed` is absent (older endpoint) the tile
-shows "—".
+selector** (colour-coded — HD purple, ED amber): both show today's cumulative
+total vs the time-of-day typical (HD from `today.cumulative` + `benchmark`, ED
+from `ed.cumulative` + `ed.benchmark`). If the ED sheet has no `Cumul. Leads`
+tab yet, the ED tile falls back to the whole-day total (`ed.todayLeads`, with
+`ed.monthToDate` as context) and shows no intraday pace. If `ed` is absent
+(older endpoint) the tile shows "—".
 
 Clicking a tile switches the detail below it (`vertical` state in `main.ts`):
-**HD** shows the "…so far" strip + pace flag + chart + HD daily table; **ED**
-shows an "ED · <month> so far" strip + the ED daily table (`ed.daily[]`;
-`src/edview.ts`). HD is the default. There is no ED chart by design.
+each vertical shows its "…so far" strip + pace flag + "Leads today" chart +
+daily table (`src/edview.ts` for ED). HD is the default. The ED flag/chart only
+render when `ed.cumulative`/`ed.benchmark` are present, so the view degrades to
+strip + table on older payloads.
 
 ## Deploy
 

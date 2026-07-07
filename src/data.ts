@@ -141,6 +141,7 @@ export function validate(raw: unknown): LeadsData {
 function normalizeEd(raw: unknown): EdSummary | null {
   if (!raw || typeof raw !== "object") return null;
   const e = raw as Record<string, unknown>;
+  const bench = e.benchmark as Record<string, unknown> | null | undefined;
   return {
     date: typeof e.date === "string" ? e.date : "",
     label: typeof e.label === "string" ? e.label : "",
@@ -150,6 +151,11 @@ function normalizeEd(raw: unknown): EdSummary | null {
     daily: Array.isArray(e.daily)
       ? e.daily.map(normalizeEdRow).filter((r) => r.leads != null || r.revenue != null)
       : [],
+    cumulative: Array.isArray(e.cumulative) ? pad24(e.cumulative) : null,
+    benchmark:
+      bench && Array.isArray(bench.high) && Array.isArray(bench.low)
+        ? { high: pad24(bench.high), low: pad24(bench.low) }
+        : null,
   };
 }
 

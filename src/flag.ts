@@ -1,7 +1,7 @@
-// Pace flag banner (§4.3, §5.2).
+// Pace flag banner (§4.3, §5.2). Vertical-agnostic: takes the cumulative
+// series + benchmark band, so both the HD and ED views can render it.
 
 import { computePace } from "./compute.ts";
-import type { LeadsData } from "./types.ts";
 
 const ICON: Record<string, string> = {
   ahead: "▲",
@@ -17,12 +17,12 @@ const TONE_CLASS: Record<string, string> = {
   none: "flag--blue",
 };
 
-export function renderFlag(data: LeadsData): string {
-  const pace = computePace(
-    data.today.cumulative,
-    data.benchmark.high,
-    data.benchmark.low,
-  );
+export function renderFlag(
+  cumulative: number[],
+  high: number[],
+  low: number[],
+): string {
+  const pace = computePace(cumulative, high, low);
 
   return `
     <section class="flag ${TONE_CLASS[pace.tone]}" role="status">

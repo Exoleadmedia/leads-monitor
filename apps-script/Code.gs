@@ -1,9 +1,9 @@
 /**
  * Leads Monitor - Apps Script data endpoint (3.2).
  *
- * Reads ONLY aggregate tabs (HD daily summary + Cumul. Leads, and the ED daily
- * summary) and returns the JSON contract the dashboard expects. It never touches
- * the lead-level/PII tabs (e.g. the ED sheet's first tab).
+ * Reads ONLY aggregate tabs (the HD and ED daily summaries + each sheet's
+ * Cumul. Leads tab) and returns the JSON contract the dashboard expects. It
+ * never touches the lead-level/PII tabs (e.g. each sheet's first tab).
  *
  * Monthly tabs are resolved automatically: each month's tab is named like
  * "June 2026" / "July 2026", and the script uses the current month's tab,
@@ -21,8 +21,11 @@
 
 // ==== CONFIG ====
 const HD_SPREADSHEET_ID = '1CH7e50P8ZWeK1uL6GQyWdhFobPUDROmThzE2vmXSxxo';
-const ED_SPREADSHEET_ID = '1c2eC_xTlSveJd5srMkz35NrCX6CdGPjqLPjZb9qUNyg';
+const ED_SPREADSHEET_ID = '1XG7lUIMbX7jgGAfTS4HTrTwUE8uZacCgJv0hlo2SNAI';
 const CUMUL_TAB = 'Cumul. Leads';   // the HD cumulative dashboard tab
+// The ED sheet's cumulative tab was cloned from the HD one; accept the common
+// name variants so a rename doesn't silently kill the ED chart.
+const ED_CUMUL_TABS = ['Cumul. Leads', 'Cumulative Leads', 'Cumul Leads'];
 
 function doGet() {
   const ss = SpreadsheetApp.openById(HD_SPREADSHEET_ID);
@@ -110,15 +113,24 @@ function readDailyFromSheet_(sh, ss) {
 
 /**
  * Returns the 24 CUMULATIVE hourly values for a labelled row
- * (Today / Benchmark High / Benchmark Low).
+ * (Today / Benchmark High / Benchmark Low), zero-filled when missing so the
+ * HD contract always carries 24 numbers.
+ */
+function readCumulRow_(ss, label) {
+  return readCumulRowFromSheet_(ss.getSheetByName(CUMUL_TAB), label)
+    || new Array(24).fill(0);
+}
+
+/**
+ * Core reader shared by HD and ED. Returns the padded 24 values for a labelled
+ * row, or null when the sheet/label doesn't exist (lets ED degrade gracefully).
  *
- * The Cumul. Leads tab has TWO blocks carrying these same labels: a per-hour
+ * A Cumul. Leads tab has TWO blocks carrying these same labels: a per-hour
  * block first, then a "Cumulative" block. We anchor on the "Cumulative" header
  * and read the labelled row beneath it. Hours run 0..23 left-to-right.
  */
-function readCumulRow_(ss, label) {
-  const sh = ss.getSheetByName(CUMUL_TAB);
-  if (!sh) return new Array(24).fill(0);
+function readCumulRowFromSheet_(sh, label) {
+  if (!sh) return null;
   const values = sh.getDataRange().getValues();
 
   let start = 0;
@@ -141,16 +153,17 @@ function readCumulRow_(ss, label) {
       }
     }
   }
-  return new Array(24).fill(0);
+  return null;
 }
 
-// ==== ED daily-summary (whole-day leads; no per-hour data) ====
+// ==== ED daily-summary + cumulative (per-hour running totals) ====
 
 /**
  * ED leads summary from the ED sheet's current month tab (fallback to the most
- * recent month with data). Returns null if the ED sheet is unreachable or has
- * no readable daily table, so the dashboard degrades gracefully.
- * Reads ONLY the named month tab - never the lead-level PII tab.
+ * recent month with data), plus - when the ED Cumul. Leads tab exists - the
+ * same Today/Benchmark cumulative rows the HD chart uses. Returns null if the
+ * ED sheet is unreachable or has no readable daily table, so the dashboard
+ * degrades gracefully. Reads ONLY aggregate tabs - never the lead-level PII tab.
  */
 function readEd_() {
   try {
@@ -162,7 +175,10 @@ function readEd_() {
       const sh = ss.getSheetByName(name);
       if (sh) {
         const res = readEdMonth_(sh, ss, name, tz);
-        if (res) return res;
+        if (res) {
+          addEdCumul_(res, ss, tz);
+          return res;
+        }
       }
       d.setMonth(d.getMonth() - 1);
     }
@@ -170,6 +186,30 @@ function readEd_() {
     // ED sheet unreachable / not authorized - degrade to no ED tile data.
   }
   return null;
+}
+
+/**
+ * Attaches `cumulative` (Today, 24 running totals) and `benchmark` {high, low}
+ * from the ED sheet's cumulative tab. When present, `todayLeads` becomes the
+ * live intraday total (the monthly tab can lag behind the pivot) and `date`
+ * becomes the actual today, mirroring what the HD tile shows.
+ */
+function addEdCumul_(res, ss, tz) {
+  let sh = null;
+  for (let i = 0; i < ED_CUMUL_TABS.length && !sh; i++) {
+    sh = ss.getSheetByName(ED_CUMUL_TABS[i]);
+  }
+  res.cumulative = readCumulRowFromSheet_(sh, 'Today');
+  const high = readCumulRowFromSheet_(sh, 'Benchmark High');
+  const low = readCumulRowFromSheet_(sh, 'Benchmark Low');
+  // An all-zero band means the benchmark rows aren't populated yet - report it
+  // as absent so the dashboard doesn't draw a flat band / bogus pace.
+  const hasBand = high && low && high.some(function (v) { return v > 0; });
+  res.benchmark = hasBand ? { high: high, low: low } : null;
+  if (res.cumulative) {
+    res.todayLeads = res.cumulative[23];
+    res.date = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
+  }
 }
 
 function readEdMonth_(sh, ss, label, tz) {

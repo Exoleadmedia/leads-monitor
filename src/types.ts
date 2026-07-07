@@ -21,18 +21,21 @@ export interface EdRow {
 }
 
 /**
- * ED leads summary (§ tiles). ED has no per-hour/cumulative tab, so today is a
- * whole-day figure read from the ED sheet's current-month tab. Optional so the
- * dashboard degrades gracefully when the endpoint predates this field or the
- * ED sheet is unreachable.
+ * ED leads summary (§ tiles). Optional so the dashboard degrades gracefully
+ * when the endpoint predates this field or the ED sheet is unreachable.
+ * `cumulative`/`benchmark` mirror the HD contract and come from the ED sheet's
+ * Cumul. Leads tab; they're null when that tab doesn't exist yet, in which
+ * case the ED view falls back to whole-day figures (no chart, no pace).
  */
 export interface EdSummary {
   date: string; // "DD/MM/YYYY" — the day todayLeads is for (latest ED day)
   label: string; // source tab, e.g. "June 2026"
-  todayLeads: number | null; // Social + Email leads for that day
+  todayLeads: number | null; // leads for that day (live intraday when cumulative exists)
   monthToDate: number | null; // Σ leads for the month so far
   avgPerDay: number | null; // monthToDate / days elapsed
   daily: EdRow[]; // one per day, oldest -> newest (drives the ED table/strip)
+  cumulative: number[] | null; // length 24, today's cumulative leads by hour
+  benchmark: { high: number[]; low: number[] } | null; // length-24 cumulative band
 }
 
 export interface LeadsData {

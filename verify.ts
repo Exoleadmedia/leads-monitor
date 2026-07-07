@@ -67,11 +67,25 @@ check("06/06 (1.71) chip", roasChipTone(1.71, med), "green");
 check("mid (1.65) chip neutral", roasChipTone(1.65, med), "neutral");
 
 // ED tile
-check("ed today leads", formatInt(data.ed!.todayLeads!), "243");
+check("ed today leads", formatInt(data.ed!.todayLeads!), "152");
 check("ed month-to-date", formatInt(data.ed!.monthToDate!), "6,520");
 check("ed date", data.ed!.date, "30/06/2026");
 check("ed daily length", data.ed!.daily.length, 30);
 check("ed daily leads sum", formatInt(data.ed!.daily.reduce((s, r) => s + (r.leads ?? 0), 0)), "6,520");
+
+// ED cumulative chart/pace (mirrors the HD logic on the ED series)
+check("ed cumulative length", data.ed!.cumulative!.length, 24);
+check("ed cumulative matches todayLeads", data.ed!.cumulative![23], data.ed!.todayLeads);
+const edCutoff = cutoffHour(data.ed!.cumulative!);
+check("ed cutoff hour", edCutoff, 13);
+const edPace = computePace(
+  data.ed!.cumulative!,
+  data.ed!.benchmark!.high,
+  data.ed!.benchmark!.low,
+);
+check("ed pace tone", edPace.tone, "ahead");
+check("ed pace today", edPace.todayAt, 152);
+check("ed typical[13]", edPace.typicalAt, 138);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

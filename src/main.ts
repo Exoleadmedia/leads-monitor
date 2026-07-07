@@ -9,10 +9,11 @@ import {
   formatInt,
   formatMoneyAbbr,
   formatRoas,
-  longDay,
   monthLabel,
 } from "./compute.ts";
 import { destroyChart, renderChart } from "./chart.ts";
+import type { ChartSeries } from "./chart.ts";
+import { chartCardHtml, legendHtml } from "./chartcard.ts";
 import { renderFlag } from "./flag.ts";
 import { renderTable } from "./table.ts";
 import { renderTiles } from "./tiles.ts";
@@ -116,44 +117,6 @@ function stripHtml(data: LeadsData): string {
   `;
 }
 
-function chartCardHtml(data: LeadsData): string {
-  const subtitle = `vs typical day · ${longDay(data.today.date)} (in progress)`;
-  return `
-    <section class="card chart-card">
-      <div class="card__head">
-        <div>
-          <div class="card__title">Leads today</div>
-          <div class="card__subtitle">${esc(subtitle)}</div>
-        </div>
-        <div class="toggle" role="group" aria-label="Chart mode">
-          <button class="toggle__seg ${chartMode === "cumulative" ? "is-active" : ""}"
-                  data-mode="cumulative" type="button"
-                  aria-pressed="${chartMode === "cumulative"}">Cumulative</button>
-          <button class="toggle__seg ${chartMode === "hourly" ? "is-active" : ""}"
-                  data-mode="hourly" type="button"
-                  aria-pressed="${chartMode === "hourly"}">Per hour</button>
-        </div>
-      </div>
-      <div class="chart-box"><canvas id="chart"></canvas></div>
-      <div class="legend" id="legend">${legendHtml()}</div>
-    </section>
-  `;
-}
-
-function legendHtml(): string {
-  if (chartMode === "cumulative") {
-    return `
-      <span class="legend__item"><span class="swatch swatch--today"></span>Today</span>
-      <span class="legend__item"><span class="swatch swatch--typical"></span>Typical day</span>
-      <span class="legend__item"><span class="swatch swatch--band"></span>Typical range</span>
-    `;
-  }
-  return `
-    <span class="legend__item"><span class="swatch swatch--bar"></span>Today / hour</span>
-    <span class="legend__item"><span class="swatch swatch--typical"></span>Typical / hour</span>
-  `;
-}
-
 function footnoteHtml(s: AppState): string {
   let source: string;
   if (s.source === "live") {
@@ -174,8 +137,12 @@ function render(): void {
 
   const detail =
     vertical === "ed"
-      ? renderEdView(s.data)
-      : `${stripHtml(s.data)}${renderFlag(s.data)}${chartCardHtml(s.data)}${renderTable(s.data)}`;
+      ? renderEdView(s.data, chartMode)
+      : `${stripHtml(s.data)}${renderFlag(
+          s.data.today.cumulative,
+          s.data.benchmark.high,
+          s.data.benchmark.low,
+        )}${chartCardHtml(s.data.today.date, chartMode, true)}${renderTable(s.data)}`;
 
   app.innerHTML = `
     <header class="header">
@@ -190,10 +157,10 @@ function render(): void {
     ${footnoteHtml(s)}
   `;
 
-  if (vertical === "hd") {
-    drawChart();
-    wireToggle();
-  }
+  // No-ops when the current detail view has no chart (e.g. ED without a
+  // Cumul. Leads tab yet — the canvas simply isn't in the DOM).
+  drawChart();
+  wireToggle();
   wireTiles();
   wireRefresh();
 }
@@ -227,12 +194,30 @@ function wireRefresh(): void {
   });
 }
 
+/** The cumulative series the current detail view charts, or null if none. */
+function chartSeries(): ChartSeries | null {
+  if (!state) return null;
+  if (vertical === "hd") {
+    return {
+      cumulative: state.data.today.cumulative,
+      high: state.data.benchmark.high,
+      low: state.data.benchmark.low,
+    };
+  }
+  const ed = state.data.ed;
+  if (!ed?.cumulative) return null;
+  return {
+    cumulative: ed.cumulative,
+    high: ed.benchmark?.high ?? null,
+    low: ed.benchmark?.low ?? null,
+  };
+}
+
 function drawChart(): void {
-  if (!state) return;
   const canvas = document.getElementById("chart") as HTMLCanvasElement | null;
-  if (!canvas) return;
-  const cutoff = cutoffHour(state.data.today.cumulative);
-  renderChart(canvas, state.data, chartMode, cutoff);
+  const series = chartSeries();
+  if (!canvas || !series) return;
+  renderChart(canvas, series, chartMode, cutoffHour(series.cumulative));
 }
 
 function wireToggle(): void {
@@ -248,7 +233,7 @@ function wireToggle(): void {
         b.setAttribute("aria-pressed", String(active));
       });
       const legend = document.getElementById("legend");
-      if (legend) legend.innerHTML = legendHtml();
+      if (legend) legend.innerHTML = legendHtml(chartMode, chartSeries()?.high != null);
       drawChart();
     });
   });

@@ -1,7 +1,10 @@
-// ED detail view: an "ED · <month> so far" summary strip + the ED daily table.
-// Shown below the tiles when the ED tile is selected. ED has no per-hour data,
-// so there is no chart — just the monthly rollup and the day-by-day breakdown.
+// ED detail view: an "ED · <month> so far" summary strip, then — when the ED
+// sheet has a Cumul. Leads tab — the same pace flag + "Leads today" chart the
+// HD view shows, and finally the ED daily table. Without cumulative data it
+// degrades to just the monthly rollup and the day-by-day breakdown.
 
+import { chartCardHtml } from "./chartcard.ts";
+import type { ChartMode } from "./chartcard.ts";
 import {
   formatCpl,
   formatInt,
@@ -11,6 +14,7 @@ import {
   roasChipTone,
   shortDay,
 } from "./compute.ts";
+import { renderFlag } from "./flag.ts";
 import type { EdRow, EdSummary, LeadsData } from "./types.ts";
 
 interface EdAgg {
@@ -137,7 +141,7 @@ function rowHtml(row: EdRow, median: number | null, isToday: boolean): string {
   `;
 }
 
-export function renderEdView(data: LeadsData): string {
+export function renderEdView(data: LeadsData, chartMode: ChartMode): string {
   const ed = data.ed;
   if (!ed || ed.daily.length === 0) {
     return `
@@ -151,7 +155,13 @@ export function renderEdView(data: LeadsData): string {
     `;
   }
   const agg = edAggregate(ed.daily);
-  return `${stripHtml(ed, agg)}${tableHtml(ed, agg)}`;
+  const flag = ed.cumulative && ed.benchmark
+    ? renderFlag(ed.cumulative, ed.benchmark.high, ed.benchmark.low)
+    : "";
+  const chart = ed.cumulative
+    ? chartCardHtml(ed.date || data.today.date, chartMode, ed.benchmark != null)
+    : "";
+  return `${stripHtml(ed, agg)}${flag}${chart}${tableHtml(ed, agg)}`;
 }
 
 function esc(s: string): string {
