@@ -115,6 +115,7 @@ export function perHour(cumulative: number[]): number[] {
 export interface Aggregates {
   paid: number; // Σ paidLeads
   revenue: number; // Σ revenue
+  spend: number; // Σ spend
   profit: number; // Σ adjProfit
   avgRoas: number | null; // mean of non-null roas
   cplAvg: number | null; // mean of non-zero, non-null cpl
@@ -123,6 +124,7 @@ export interface Aggregates {
 export function aggregate(daily: DailyRow[]): Aggregates {
   let paid = 0;
   let revenue = 0;
+  let spend = 0;
   let profit = 0;
 
   const roasVals: number[] = [];
@@ -131,6 +133,7 @@ export function aggregate(daily: DailyRow[]): Aggregates {
   for (const row of daily) {
     paid += row.paidLeads ?? 0;
     revenue += row.revenue ?? 0;
+    spend += row.spend ?? 0;
     profit += row.adjProfit ?? 0;
     if (row.roas != null) roasVals.push(row.roas);
     if (row.cpl != null && row.cpl !== 0) cplVals.push(row.cpl);
@@ -139,6 +142,7 @@ export function aggregate(daily: DailyRow[]): Aggregates {
   return {
     paid,
     revenue,
+    spend,
     profit,
     avgRoas: mean(roasVals),
     cplAvg: mean(cplVals),

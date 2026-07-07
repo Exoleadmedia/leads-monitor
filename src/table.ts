@@ -41,7 +41,7 @@ export function renderTable(data: LeadsData): string {
             <tr>
               <th class="num--left">Date</th>
               <th>Paid</th>
-              <th>Revenue</th>
+              <th>Spend</th>
               <th>CPL</th>
               <th>Profit</th>
               <th>ROAS</th>
@@ -52,7 +52,7 @@ export function renderTable(data: LeadsData): string {
             <tr>
               <td class="num--left">Total</td>
               <td>${formatInt(totals.paid)}</td>
-              <td>${formatMoney(totals.revenue)}</td>
+              <td>${formatMoney(totals.spend)}</td>
               <td>${formatCpl(totals.cplAvg)}</td>
               <td>${formatMoney(totals.profit)}</td>
               <td>${formatRoas(totals.avgRoas)}</td>
@@ -71,7 +71,7 @@ function renderRow(row: DailyRow, median: number | null, isToday: boolean): stri
     <tr class="${isToday ? "row--today" : ""}">
       <td class="num--left">${esc(shortDay(row.date))}</td>
       <td>${row.paidLeads == null ? "—" : formatInt(row.paidLeads)}</td>
-      <td>${formatMoney(row.revenue)}</td>
+      <td>${formatMoney(row.spend)}</td>
       <td>${formatCpl(row.cpl)}</td>
       <td>${formatMoney(row.adjProfit)}</td>
       <td>${chip}</td>

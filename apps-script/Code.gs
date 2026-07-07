@@ -102,6 +102,7 @@ function readDailyFromSheet_(sh, ss) {
       date: date,
       paidLeads: paid,
       revenue: toNumOrNull_(values[r][col['Revenue']]),
+      spend: ('Spend' in col) ? toNumOrNull_(values[r][col['Spend']]) : null,
       cpl: toNumOrNull_(values[r][col['CPL']]),
       adjProfit: toNumOrNull_(values[r][col['Adj. Profit']]),
       roas: toNumOrNull_(values[r][col['ROAS']])
@@ -248,6 +249,7 @@ function readEdMonth_(sh, ss, label, tz) {
       date: date,
       leads: social + email,
       revenue: ('Revenue' in col) ? toNumOrNull_(values[r][col['Revenue']]) : null,
+      spend: ('Spend' in col) ? toNumOrNull_(values[r][col['Spend']]) : null,
       cpl: ('CPL' in col) ? toNumOrNull_(values[r][col['CPL']]) : null,
       adjProfit: ('Adj. Profit' in col) ? toNumOrNull_(values[r][col['Adj. Profit']]) : null,
       roas: ('ROAS' in col) ? toNumOrNull_(values[r][col['ROAS']]) : null

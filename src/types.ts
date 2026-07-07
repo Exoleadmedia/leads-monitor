@@ -5,6 +5,7 @@ export interface DailyRow {
   date: string; // "DD/MM/YYYY"
   paidLeads: number | null;
   revenue: number | null;
+  spend: number | null; // ad spend (the daily table shows this, not revenue)
   cpl: number | null;
   adjProfit: number | null;
   roas: number | null;
@@ -15,6 +16,7 @@ export interface EdRow {
   date: string; // "DD/MM/YYYY"
   leads: number | null; // Social + Email leads
   revenue: number | null;
+  spend: number | null;
   cpl: number | null;
   adjProfit: number | null;
   roas: number | null;

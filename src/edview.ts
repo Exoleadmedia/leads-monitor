@@ -20,6 +20,7 @@ import type { EdRow, EdSummary, LeadsData } from "./types.ts";
 interface EdAgg {
   leads: number;
   revenue: number;
+  spend: number;
   profit: number;
   avgRoas: number | null;
   cplAvg: number | null;
@@ -28,12 +29,14 @@ interface EdAgg {
 function edAggregate(rows: EdRow[]): EdAgg {
   let leads = 0;
   let revenue = 0;
+  let spend = 0;
   let profit = 0;
   const roas: number[] = [];
   const cpl: number[] = [];
   for (const r of rows) {
     leads += r.leads ?? 0;
     revenue += r.revenue ?? 0;
+    spend += r.spend ?? 0;
     profit += r.adjProfit ?? 0;
     if (r.roas != null) roas.push(r.roas);
     if (r.cpl != null && r.cpl !== 0) cpl.push(r.cpl);
@@ -41,6 +44,7 @@ function edAggregate(rows: EdRow[]): EdAgg {
   return {
     leads,
     revenue,
+    spend,
     profit,
     avgRoas: roas.length ? roas.reduce((s, v) => s + v, 0) / roas.length : null,
     cplAvg: cpl.length ? cpl.reduce((s, v) => s + v, 0) / cpl.length : null,
@@ -111,7 +115,7 @@ function tableHtml(ed: EdSummary, agg: EdAgg): string {
             <tr>
               <th class="num--left">Date</th>
               <th>Leads</th>
-              <th>Revenue</th>
+              <th>Spend</th>
               <th>CPL</th>
               <th>Profit</th>
               <th>ROAS</th>
@@ -122,7 +126,7 @@ function tableHtml(ed: EdSummary, agg: EdAgg): string {
             <tr>
               <td class="num--left">Total</td>
               <td>${formatInt(agg.leads)}</td>
-              <td>${formatMoney(agg.revenue)}</td>
+              <td>${formatMoney(agg.spend)}</td>
               <td>${formatCpl(agg.cplAvg)}</td>
               <td>${formatMoney(agg.profit)}</td>
               <td>${formatRoas(agg.avgRoas)}</td>
@@ -140,7 +144,7 @@ function rowHtml(row: EdRow, median: number | null, isToday: boolean): string {
     <tr class="${isToday ? "row--today" : ""}">
       <td class="num--left">${esc(shortDay(row.date))}</td>
       <td>${row.leads == null ? "—" : formatInt(row.leads)}</td>
-      <td>${formatMoney(row.revenue)}</td>
+      <td>${formatMoney(row.spend)}</td>
       <td>${formatCpl(row.cpl)}</td>
       <td>${formatMoney(row.adjProfit)}</td>
       <td><span class="chip chip--${tone}">${formatRoas(row.roas)}</span></td>

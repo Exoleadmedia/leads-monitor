@@ -73,6 +73,11 @@ check("ed date", data.ed!.date, "30/06/2026");
 check("ed daily length", data.ed!.daily.length, 30);
 check("ed daily leads sum", formatInt(data.ed!.daily.reduce((s, r) => s + (r.leads ?? 0), 0)), "6,520");
 
+// Spend column (tables show spend instead of revenue)
+check("spend total", formatMoney(agg.spend), "$125,843");
+check("ed spend sum", formatMoney(data.ed!.daily.reduce((s, r) => s + (r.spend ?? 0), 0)), "$36,275");
+check("30/06 spend null -> —", formatMoney(data.daily[29].spend), "—");
+
 // ED cumulative chart/pace (mirrors the HD logic on the ED series)
 check("ed cumulative length", data.ed!.cumulative!.length, 24);
 check("ed cumulative matches todayLeads", data.ed!.cumulative![23], data.ed!.todayLeads);
