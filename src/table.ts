@@ -17,8 +17,10 @@ export function renderTable(data: LeadsData): string {
   const median = roasMedian(daily);
   const totals = aggregate(daily);
 
-  // Determine which row to highlight: today's date, else the latest date.
-  const highlightDate = data.today.date || lastDate(daily);
+  // Highlight today's row; until the monthly tab has one (early in the day),
+  // fall back to the latest row.
+  const hasToday = daily.some((r) => r.date === data.today.date);
+  const highlightDate = hasToday ? data.today.date : lastDate(daily);
 
   // Newest first.
   const rows = [...daily].reverse();

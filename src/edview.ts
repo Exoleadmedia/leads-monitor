@@ -87,7 +87,14 @@ function stripHtml(ed: EdSummary, agg: EdAgg): string {
 function tableHtml(ed: EdSummary, agg: EdAgg): string {
   const rows = ed.daily;
   const median = edRoasMedian(rows);
-  const highlight = ed.date || (rows.length ? rows[rows.length - 1].date : "");
+  // Highlight today's row; until the monthly tab has one (early in the day),
+  // fall back to the latest row.
+  const hasToday = rows.some((r) => r.date === ed.date);
+  const highlight = hasToday
+    ? ed.date
+    : rows.length
+      ? rows[rows.length - 1].date
+      : "";
   const body = [...rows]
     .reverse()
     .map((row) => rowHtml(row, median, row.date === highlight))

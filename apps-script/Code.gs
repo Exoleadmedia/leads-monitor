@@ -34,9 +34,10 @@ function doGet() {
   const out = {
     syncedAt: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ssXXX"),
     today: {
-      // The Cumul. Leads "Today" row tracks TODAY(); label the day with the
-      // newest daily row so it stays consistent with the daily table.
-      date: daily.length ? daily[daily.length - 1].date : '',
+      // Actual today in the sheet's timezone - the Cumul. Leads "Today" row
+      // tracks TODAY(), so the chart/tile date must roll over at midnight even
+      // though the monthly tab has no row for the new day yet.
+      date: Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy'),
       label: 'Today',
       cumulative: readCumulRow_(ss, 'Today')
     },
