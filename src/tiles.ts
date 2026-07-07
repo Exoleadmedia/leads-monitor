@@ -60,11 +60,7 @@ function hdTileHtml(data: LeadsData, active: boolean): string {
 /** The ED tile: mirrors the HD one when ED cumulative + benchmark data exist. */
 function edTileHtml(data: LeadsData, active: boolean): string {
   const ed = data.ed;
-
-  // Show which day the figure is for when it differs from HD's "today" (e.g.
-  // during a month/day rollover) so the two tiles are never silently misaligned.
-  const tag =
-    ed && ed.date && ed.date !== data.today.date ? shortDay(ed.date) : "today so far";
+  const tag = "today so far";
 
   if (ed?.cumulative && ed.benchmark) {
     const pace = computePace(ed.cumulative, ed.benchmark.high, ed.benchmark.low);
