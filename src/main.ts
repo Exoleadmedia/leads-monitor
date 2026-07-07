@@ -101,7 +101,7 @@ function stripHtml(data: LeadsData): string {
   const month = monthLabel(data.today.date);
   return `
     <section class="card strip-card">
-      <div class="card__title">${esc(month)} so far</div>
+      <div class="card__title">HD · ${esc(month)} so far</div>
       <div class="strip">
         ${cells
           .map(
