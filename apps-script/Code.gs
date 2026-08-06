@@ -78,18 +78,24 @@ function readDailyFromSheet_(sh, ss) {
   const col = {};
   for (let r = 0; r < values.length; r++) {
     const row = values[r].map(function (x) { return String(x).trim(); });
-    if (row.indexOf('Paid Leads') !== -1 && row.indexOf('Date') !== -1) {
+    // From August 2026 the leads column is named "All Leads" (with separate
+    // Email Leads / Leads Used columns); older tabs say "Paid Leads".
+    if (row.indexOf('Date') !== -1 &&
+        (row.indexOf('Paid Leads') !== -1 || row.indexOf('All Leads') !== -1)) {
       h = r;
-      row.forEach(function (name, i) { col[name] = i; });
+      // Keep the FIRST occurrence of each name - the August header repeats
+      // "All Leads" in a stray block far to the right of the daily table.
+      row.forEach(function (name, i) { if (!(name in col)) col[name] = i; });
       break;
     }
   }
   if (h === -1) return [];
+  const leadsCol = ('Paid Leads' in col) ? col['Paid Leads'] : col['All Leads'];
   const out = [];
   for (let r = h + 1; r < values.length; r++) {
     const date = formatDate_(values[r][col['Date']], ss);
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) continue; // skip non-date / junk rows
-    const paid = toNumOrNull_(values[r][col['Paid Leads']]);
+    const paid = toNumOrNull_(values[r][leadsCol]);
     if (paid === null) {
       // Monthly tabs pre-list every date of the month; a blank Paid Leads is a
       // future day with no data yet. Data fills top-down, so stop at the first

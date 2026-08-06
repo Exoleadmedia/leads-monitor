@@ -98,7 +98,11 @@ function stripHtml(data: LeadsData): string {
     { label: "Profit", value: formatMoneyAbbr(a.profit) },
     { label: "Avg ROAS", value: formatRoas(a.avgRoas) },
   ];
-  const month = monthLabel(data.today.date);
+  // Label with the month the daily rows actually belong to - the backend falls
+  // back to the previous month's tab when the current one isn't readable yet,
+  // and calling that data "August so far" would be wrong.
+  const lastDay = data.daily[data.daily.length - 1];
+  const month = monthLabel(lastDay ? lastDay.date : data.today.date);
   return `
     <section class="card strip-card">
       <div class="card__title">HD · ${esc(month)} so far</div>
