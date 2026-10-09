@@ -58,13 +58,15 @@ It reads **two** spreadsheets, HD and ED (`HD_SPREADSHEET_ID`,
 percent cells to plain numbers server side. No personal data ever reaches the
 browser. Keep it that way.**
 
-The same web app also answers `?view=forms` for the **Forms tab**: it reads the
-form analytics views in Supabase (`form_funnel_detail`, `form_questions`; schema
-in `web-budgetwise-australia/sql/form-analytics.sql`) and returns per day totals
-per form, device and UTM, 60 days back. It needs two **Script Properties**
-(Project Settings, Script properties), never in code: `SUPABASE_URL` and
-`SUPABASE_SERVICE_KEY` (the legacy `service_role` key). Without them the Forms
-tab shows "Couldn't load form data" and the Leads view is unaffected.
+The **Forms tab** does not use the Apps Script. It reads
+`https://go.budgetwiseaustralia.com/api/form-stats`, a Cloudflare Pages Function
+in `Exoleadmedia/web-budgetwise-australia` that queries the Supabase form
+analytics views (schema in that repo's `sql/form-analytics.sql`) with the
+Supabase key already held in that Cloudflare project, and returns per day
+totals per form, device and UTM, 60 days back. Browsers may only read it from
+`exoleadmedia.github.io` and `localhost` (CORS). Local runs without
+`VITE_DATA_URL` use `public/forms-sample.json`; `VITE_FORMS_URL` overrides the
+endpoint. If it's down the Forms tab says so and the Leads view is unaffected.
 
 ## Sync resilience
 
@@ -86,7 +88,7 @@ src/
   chartcard.ts tiles.ts flag.ts table.ts edview.ts   view components
   ui.css       design tokens, light mode only
   types.ts     the JSON contract
-  formsdata.ts    Forms tab fetch (?view=forms), cache, fixture fallback
+  formsdata.ts    Forms tab fetch (/api/form-stats), cache, fixture fallback
   formscompute.ts Forms tab maths: filters, per form funnel rows (pure)
   formsview.ts    Forms tab render and interactions
 public/leads-sample.json    bundled fixture
@@ -139,5 +141,5 @@ campaign and ad (each list only shows what's under the choice before it).
   (`goBWA_...` is BWA). Add new site codes to `SITE_NAMES` in `formscompute.ts`.
 - `node verify.ts` includes hand checked Forms tab cases.
 - Data volume: the payload is per day per UTM combination, paged 1000 rows at
-  a time from Supabase. If it grows slow after the rollout to every site, add a
+  a time from Supabase by `/api/form-stats`. If it grows slow after the rollout to every site, add a
   pre-aggregated table or a Postgres function rather than widening the range.

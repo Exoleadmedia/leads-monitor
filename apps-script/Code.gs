@@ -27,13 +27,7 @@ const CUMUL_TAB = 'Cumul. Leads';   // the HD cumulative dashboard tab
 // name variants so a rename doesn't silently kill the ED chart.
 const ED_CUMUL_TABS = ['Cumul. Leads', 'Cumulative Leads', 'Cumul Leads'];
 
-function doGet(e) {
-  // The Forms tab asks for its own data (?view=forms) only when it is opened,
-  // so the leads view below never waits on Supabase.
-  if (e && e.parameter && e.parameter.view === 'forms') {
-    return ContentService.createTextOutput(JSON.stringify(readForms_()))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
+function doGet() {
   const ss = SpreadsheetApp.openById(HD_SPREADSHEET_ID);
   const tz = ss.getSpreadsheetTimeZone();
   const daily = readDaily_(ss, tz);
@@ -287,94 +281,6 @@ function readEdMonth_(sh, ss, label, tz) {
     avgPerDay: rows.length ? mtd / rows.length : null,
     daily: rows
   };
-}
-
-// ==== Form funnels (Supabase) ====
-// Reads the form analytics views from Supabase (schema and views:
-// web-budgetwise-australia/sql/form-analytics.sql). Needs two Script
-// Properties, never in code: SUPABASE_URL and SUPABASE_SERVICE_KEY (the legacy
-// service_role key). Only per day totals leave this function: no sessions, no
-// IP addresses, no personal data.
-
-const FORMS_DAYS = 60; // longest range (30 days) plus the previous 30 for the change column
-const FORMS_PAGE = 1000; // Supabase returns at most 1000 rows per request
-
-function readForms_() {
-  try {
-    const props = PropertiesService.getScriptProperties();
-    const base = props.getProperty('SUPABASE_URL');
-    const key = props.getProperty('SUPABASE_SERVICE_KEY');
-    if (!base || !key) return { error: 'Supabase is not configured in Script Properties' };
-    const headers = { apikey: key, Authorization: 'Bearer ' + key };
-    const tz = 'Australia/Sydney';
-    const since = Utilities.formatDate(new Date(Date.now() - FORMS_DAYS * 864e5), tz, 'yyyy-MM-dd');
-
-    // One row per form, day, device, traffic source and question.
-    const cols = 'form_id,day,device,utm_source,utm_campaign,utm_content,step,sort_order,views,shown,dropped,leads';
-    const rows = [];
-    for (let offset = 0; ; offset += FORMS_PAGE) {
-      const page = supabaseGet_(base, headers, 'form_funnel_detail?select=' + cols +
-        '&day=gte.' + since +
-        '&order=form_id,day,device,utm_source,utm_campaign,utm_content,step' +
-        '&limit=' + FORMS_PAGE + '&offset=' + offset);
-      Array.prototype.push.apply(rows, page);
-      if (page.length < FORMS_PAGE) break;
-    }
-
-    // Fold the question rows into one group per form/day/device/traffic source:
-    // s[step] = [shown, dropped, sort order].
-    const groups = {};
-    const formIds = [];
-    rows.forEach(function (r) {
-      const k = [r.form_id, r.day, r.device, r.utm_source, r.utm_campaign, r.utm_content].join('\u0001');
-      let g = groups[k];
-      if (!g) {
-        g = groups[k] = { f: r.form_id, d: r.day, dev: r.device, src: r.utm_source,
-          camp: r.utm_campaign, ad: r.utm_content, v: r.views, l: r.leads, s: {} };
-        if (formIds.indexOf(r.form_id) < 0) formIds.push(r.form_id);
-      }
-      g.s[r.step] = [r.shown, r.dropped, Math.round(Number(r.sort_order) * 100) / 100];
-    });
-
-    // The page each form lives on, for display.
-    const pages = UrlFetchApp.fetchAll(formIds.map(function (id) {
-      return {
-        url: base + '/rest/v1/form_events?select=page_path&event=eq.page_view&is_preview=eq.false' +
-          '&form_id=eq.' + encodeURIComponent(id) + '&order=id.desc&limit=1',
-        headers: headers,
-        muteHttpExceptions: true
-      };
-    }));
-    const forms = formIds.map(function (id, i) {
-      let path = null;
-      try { path = (JSON.parse(pages[i].getContentText())[0] || {}).page_path || null; } catch (err) {}
-      return { id: id, path: path };
-    });
-
-    const labels = {};
-    supabaseGet_(base, headers, 'form_questions?select=key,label').forEach(function (q) {
-      labels[q.key] = q.label;
-    });
-
-    return {
-      syncedAt: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ssXXX"),
-      today: Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'),
-      since: since,
-      labels: labels,
-      forms: forms,
-      groups: Object.keys(groups).map(function (k) { return groups[k]; })
-    };
-  } catch (err) {
-    return { error: String(err && err.message || err) };
-  }
-}
-
-function supabaseGet_(base, headers, path) {
-  const res = UrlFetchApp.fetch(base + '/rest/v1/' + path, { headers: headers, muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) {
-    throw new Error('Supabase ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 200));
-  }
-  return JSON.parse(res.getContentText());
 }
 
 // ==== shared helpers ====

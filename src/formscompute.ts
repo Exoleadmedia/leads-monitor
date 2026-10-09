@@ -1,4 +1,4 @@
-// Forms tab maths: turn the ?view=forms payload into one funnel row per form
+// Forms tab maths: turn the /api/form-stats payload into one funnel row per form
 // for the chosen filters. No browser or build-time dependencies, so verify.ts
 // can run it under plain Node.
 
