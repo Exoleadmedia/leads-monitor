@@ -27,6 +27,8 @@ let onStatus: (() => void) | null = null;
 let filters: Filters = { range: 7, site: "", device: "", src: "", camp: "", ad: "" };
 let mode: Mode = "reach";
 let sort: SortKey = "comp";
+let trafficOpen = false; // phones: traffic dropdowns tucked behind a button
+const openCards = new Set<string>(); // phones: form cards showing their question list
 
 /** Header pill state for the Forms tab. */
 export function formsStatus(): { status: SyncStatus; syncedAt: string } {
@@ -137,9 +139,11 @@ function draw(): void {
   const byComp = rows.slice().sort((a, b) => b.comp - a.comp);
   const traffic = Boolean(filters.src || filters.camp || filters.ad);
 
-  const seg = (name: string, cur: string, opts: [string, string][]): string =>
+  const seg = (name: string, cur: string, opts: [string, string, string?][]): string =>
     `<div class="ff-seg" data-seg="${name}">${opts
-      .map(([v, t]) => `<button type="button" data-v="${v}" class="${v === cur ? "on" : ""}" aria-pressed="${v === cur}">${t}</button>`)
+      .map(([v, t, short]) => `<button type="button" data-v="${v}" class="${v === cur ? "on" : ""}" aria-pressed="${v === cur}">${
+        short ? `<span class="ff-lg">${t}</span><span class="ff-sm">${short}</span>` : t
+      }</button>`)
       .join("")}</div>`;
   const select = (name: string, all: string, cur: string, opts: [string, string][]): string =>
     `<select data-f="${name}" class="${cur ? "active" : ""}" aria-label="${esc(all)}"><option value="">${esc(all)}</option>${opts
@@ -205,6 +209,60 @@ function draw(): void {
     cols.map(() => `<col>`).join("") +
     `<col class="c-comp"><col class="c-num"><col class="c-num"></colgroup>`;
 
+  // Phones: one card per form instead of the wide table. The strip has one
+  // block per question (same colours as the table); tapping opens the list.
+  const sortOpts: [SortKey, string][] = [["comp", "Completion"], ["views", "Views"], ["leads", "Leads"], ["started", "Started"], ["delta", "Change"], ["name", "Name"]];
+  const cards = `<div class="ff-cards ff-phone">
+      <label class="ff-sort">Sort by <select data-sort>${sortOpts
+        .map(([k, t]) => `<option value="${k}"${k === sort ? " selected" : ""}>${t}</option>`)
+        .join("")}</select></label>
+      ${rows
+        .map((r) => {
+          const quitMode = mode !== "reach";
+          const strip = r.qs
+            .map((k, i) => {
+              const quit = r.quit[i];
+              const val = quitMode ? (quit == null ? "–" : pct(quit)) : pct(r.reach[i]);
+              const shade = quitMode ? (quit == null ? 0 : 1 - Math.min(1, quit * 2.5)) : r.reach[i];
+              return `<span class="ff-strip__b${i === r.leak ? " drop" : ""}" style="${cellStyle(shade)}" title="${esc(label(k))}">${val}</span>`;
+            })
+            .join("");
+          const steps = r.qs
+            .map((k, i) => {
+              const quit = r.quit[i];
+              return `<div class="ff-step${i === r.leak ? " is-leak" : ""}">
+                <span class="ff-step__n">${k === "lead" ? "Form" : `Q${i + 1}`}</span>
+                <span class="ff-step__l">${esc(label(k))}</span>
+                <span class="ff-step__bar"><i style="width:${Math.round(r.reach[i] * 100)}%"></i></span>
+                <span class="ff-step__v">${pct(r.reach[i])}</span>
+                <span class="ff-step__q">${quit == null ? "–" : `−${pct(quit)}`}</span>
+              </div>`;
+            })
+            .join("");
+          const d = r.delta;
+          const delta =
+            d == null ? "" : Math.abs(d) < 0.05 ? `<span class="ff-delta">0.0</span>`
+            : `<span class="ff-delta ${d > 0 ? "up" : "down"}">${d > 0 ? "▲ +" : "▼ −"}${Math.abs(d).toFixed(1)}</span>`;
+          return `<details class="ff-fc" data-id="${esc(r.id)}"${openCards.has(r.id) ? " open" : ""}>
+            <summary>
+              <div class="ff-fc__head"><span class="ff-site">${esc(r.site)}</span><span class="ff-fc__name">${esc(r.name)}</span>${delta}</div>
+              <div class="ff-fc__stats">
+                <span><b>${int(r.views)}</b> views</span>
+                <span><b>${r.started == null ? "–" : pct(r.started)}</b> started</span>
+                <span><b>${int(r.leads)}</b> leads</span>
+                <span class="ff-fc__comp"><b>${pct(r.comp)}</b><span class="ff-bar"><i style="width:${Math.min(100, (r.comp * 100) / 0.4)}%"></i></span></span>
+              </div>
+              <div class="ff-strip">${strip}</div>
+            </summary>
+            <div class="ff-steps">
+              <div class="ff-step ff-step--head"><span></span><span>Question</span><span></span><span>Reached</span><span>Quit</span></div>
+              ${steps}
+            </div>
+          </details>`;
+        })
+        .join("")}
+    </div>`;
+
   const kpi = (l: string, v: string, d: string, small = false): string =>
     `<div class="ff-kpi"><div class="l">${l}</div><div class="v${small ? " small" : ""}" title="${esc(v)}">${esc(v)}</div><div class="d">${d}</div></div>`;
   const best = byComp[0];
@@ -229,13 +287,16 @@ function draw(): void {
     <div class="forms">
       <div class="ff-filters">
         ${seg("range", String(filters.range), [["1", "Today"], ["7", "7 days"], ["30", "30 days"]])}
-        ${seg("mode", mode, [["reach", "% reached"], ["drop", "Drop-off per step"], ["question", "Compare by question"]])}
+        ${seg("mode", mode, [["reach", "% reached"], ["drop", "Drop-off per step", "Drop-off"], ["question", "Compare by question", "By question"]])}
         ${select("site", "All sites", filters.site, sites.map((x) => [x, SITE_NAMES[x] ?? x]))}
         ${select("device", "All devices", filters.device, [["mobile", "Mobile"], ["desktop", "Desktop"]])}
         <span class="ff-spacer"></span>
-        <span class="ff-sub">Click a column header to sort</span>
+        <span class="ff-sub ff-desktop">Click a column header to sort</span>
       </div>
-      <div class="ff-filters">
+      <button type="button" class="ff-traffic-toggle${traffic ? " is-set" : ""}" data-traffic aria-expanded="${trafficOpen}">
+        Traffic filters${traffic ? ` (${[filters.src, filters.camp, filters.ad].filter(Boolean).length})` : ""} <span aria-hidden="true">${trafficOpen ? "▴" : "▾"}</span>
+      </button>
+      <div class="ff-filters ff-traffic${trafficOpen ? " is-open" : ""}">
         <span class="ff-flabel">Traffic</span>
         <label class="ff-f"><span>Source</span>${select("src", "All sources", filters.src, own(view.options.src))}</label>
         <label class="ff-f"><span>Campaign</span>${select("camp", "All campaigns", filters.camp, own(view.options.camp))}</label>
@@ -243,11 +304,11 @@ function draw(): void {
         ${traffic ? `<button type="button" class="ff-clear" data-clear>Clear traffic filters</button>` : ""}
         <span class="ff-sub">${view.hidden ? `${view.hidden} form${view.hidden > 1 ? "s" : ""} hidden (no traffic matching these filters)` : ""}</span>
       </div>
-      <p class="ff-modehelp"><span class="ff-layout${simple ? " is-simple" : ""}">${badge}</span> ${HELP[mode]}</p>
+      <p class="ff-modehelp"><span class="ff-layout${simple ? " is-simple" : ""}">${badge}</span> <span class="ff-desktop">${HELP[mode]}</span></p>
       <div class="ff-kpis">${kpis}</div>
       <div class="ff-card">
         ${rows.length
-          ? `<div class="ff-scroll"><table class="ff-table">${colgroup}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`
+          ? `<div class="ff-scroll ff-desktop"><table class="ff-table">${colgroup}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${cards}`
           : `<p class="ff-empty">No form visits in this period${traffic || filters.site || filters.device ? " with these filters" : " yet"}.</p>`}
         <div class="ff-legend">
           ${mode === "reach" ? `<span>% reached <span class="ff-ramp">${ramp}</span> 0% → 100%</span>` : `<span>Darker = fewer people quit <span class="ff-ramp">${ramp}</span></span>`}
@@ -282,6 +343,21 @@ function wire(rows: FormRow[], label: (k: string) => string): void {
       if (k === "src") filters.camp = filters.ad = "";
       if (k === "camp") filters.ad = "";
       draw();
+    });
+  });
+  root.querySelector("[data-traffic]")?.addEventListener("click", () => {
+    trafficOpen = !trafficOpen;
+    draw();
+  });
+  root.querySelector<HTMLSelectElement>("select[data-sort]")?.addEventListener("change", (e) => {
+    sort = (e.target as HTMLSelectElement).value as SortKey;
+    draw();
+  });
+  root.querySelectorAll<HTMLDetailsElement>("details.ff-fc").forEach((d) => {
+    d.addEventListener("toggle", () => {
+      const id = d.dataset.id ?? "";
+      if (d.open) openCards.add(id);
+      else openCards.delete(id);
     });
   });
   root.querySelector("[data-clear]")?.addEventListener("click", () => {

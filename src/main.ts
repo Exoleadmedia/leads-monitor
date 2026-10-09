@@ -85,10 +85,19 @@ function syncFormsHeader(): void {
   }
 }
 
+const PROMPT_BUILDER_URL = "https://prompt-builder-d1j.pages.dev/";
+
+const ICONS = {
+  leads: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg>`,
+  forms: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>`,
+  prompts: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>`,
+};
+
+/** Main menu: a segmented switch at the top on desktop, a bar fixed to the bottom on phones. */
 function tabsHtml(): string {
   const tab = (v: "leads" | "forms", text: string): string =>
-    `<button type="button" class="toggle__seg${view === v ? " is-active" : ""}" data-view="${v}" aria-pressed="${view === v}">${text}</button>`;
-  return `<nav class="toggle tabs" aria-label="Dashboard view">${tab("leads", "Leads")}${tab("forms", "Forms")}</nav>`;
+    `<button type="button" class="toggle__seg tabs__item${view === v ? " is-active" : ""}" data-view="${v}" aria-pressed="${view === v}">${ICONS[v]}<span>${text}</span></button>`;
+  return `<nav class="toggle tabs" aria-label="Dashboard view">${tab("leads", "Leads")}${tab("forms", "Forms")}<a class="toggle__seg tabs__item tabs__link" href="${PROMPT_BUILDER_URL}" target="_blank" rel="noopener">${ICONS.prompts}<span>Prompts</span></a></nav>`;
 }
 
 /** Top-right header cluster: status pill + manual "force sync" button. */

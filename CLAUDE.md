@@ -119,6 +119,15 @@ Run `node verify.ts`. It runs the real compute functions against the fixture and
 asserts every number in the spec's acceptance criteria. If it passes, the maths
 still matches what the dashboard promised.
 
+## Menu
+
+Leads, Forms and **Prompts** (a link to the prompt builder,
+`https://prompt-builder-d1j.pages.dev`, opening in a new tab; set in
+`PROMPT_BUILDER_URL` in `main.ts`). On desktop it's the switch under the header;
+on phones (≤700px) it's a bar fixed to the bottom of the screen, with icons, and
+the page gets extra bottom padding so nothing hides behind it. Note
+`prompt-builder.pages.dev` without the suffix is someone else's site.
+
 ## Forms tab
 
 Added 2026-10-09 per Kevin (design: `Claude outputs/form-dashboard-mockup.html`
@@ -141,6 +150,12 @@ campaign and ad (each list only shows what's under the choice before it).
   separate from the dashboard's own tokens. It's read mostly on desktop, so the
   tab uses the full window width; question columns share the spare width
   equally (`table-layout: fixed` + `<colgroup>`). Phones scroll the table.
+- **Phones (≤700px)** get their own layout (Kevin, 2026-10-09: the squeezed
+  desktop view was "horrible"): one card per form instead of the table (stats,
+  a coloured strip with a block per question, tap to open the question list),
+  a "Sort by" select instead of column headers, traffic filters behind a
+  button, short mode labels, no help paragraph. Both layouts are rendered;
+  CSS shows one (`.ff-desktop` / `.ff-phone`).
 - **Biggest leak** (red outline) needs at least 10 people shown the question.
 - Form names are the page path; the site badge comes from the `_c_dt` prefix
   (`goBWA_...` is BWA). Add new site codes to `SITE_NAMES` in `formscompute.ts`.
