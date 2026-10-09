@@ -136,6 +136,11 @@ campaign and ad (each list only shows what's under the choice before it).
   columns are positions with the name inside each cell. "By question" lines up
   the same question across forms. Question order per form comes from the whole
   60 day payload, so columns don't reshuffle when a filter empties a question.
+- **Looks like the mockup on purpose** (Kevin, 2026-10-09: "the mockup looks
+  better"): its styles are ported into `ui.css` under `.forms` / `ff-` classes,
+  separate from the dashboard's own tokens. It's read mostly on desktop, so the
+  tab uses the full window width; question columns share the spare width
+  equally (`table-layout: fixed` + `<colgroup>`). Phones scroll the table.
 - **Biggest leak** (red outline) needs at least 10 people shown the question.
 - Form names are the page path; the site badge comes from the `_c_dt` prefix
   (`goBWA_...` is BWA). Add new site codes to `SITE_NAMES` in `formscompute.ts`.

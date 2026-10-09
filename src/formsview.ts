@@ -27,7 +27,6 @@ let onStatus: (() => void) | null = null;
 let filters: Filters = { range: 7, site: "", device: "", src: "", camp: "", ad: "" };
 let mode: Mode = "reach";
 let sort: SortKey = "comp";
-let detail = "";
 
 /** Header pill state for the Forms tab. */
 export function formsStatus(): { status: SyncStatus; syncedAt: string } {
@@ -96,20 +95,23 @@ function shortName(name: string, max = 26): string {
 const pct = (p: number): string => `${(p * 100).toFixed(p < 0.1 ? 1 : 0)}%`;
 const int = (n: number): string => n.toLocaleString("en-AU");
 
+// Wording from the mockup.
 const HELP: Record<Mode, string> = {
   reach:
-    "Cell = % of page visitors who reached that question. When the forms shown ask the same questions in the same order, the names go in the headers; when they differ, columns follow each form's own order and the name is inside each cell. The contact form is always the last column.",
-  drop: "Cell = % who quit at that step, out of the people who were shown it. Same automatic layout as % reached.",
+    "Switches automatically: when all the forms shown ask the same questions in the same order, question names go in the headers; when they differ, columns follow each form's own order and the question name is printed inside each cell. The contact form always lines up in the last column.",
+  drop: "Same automatic layout, but each cell shows the % who quit at that step (of the people who were shown it).",
   question:
-    "One column per question, wherever it sits in each form (#n = its position). Cell = % who quit at that question. Shows whether a question loses people everywhere, or only where it's placed.",
+    "Columns = the same question across every form, wherever it sits in that form (#n = its position). Cell = % who quit at that question. Use this to see if a question loses people on every form, or only where it's placed.",
 };
 
 function draw(): void {
   if (!root) return;
   if (!payload) {
-    root.innerHTML = failed
-      ? `<p class="fatal">Couldn't load form data. Tap refresh to try again.</p>`
-      : `<div class="skeleton">Loading form funnels…</div>`;
+    root.innerHTML = `<div class="forms">${
+      failed
+        ? `<div class="ff-card"><p class="ff-empty">Couldn't load form data. Tap refresh to try again.</p></div>`
+        : `<div class="ff-card"><p class="ff-empty">Loading form funnels…</p></div>`
+    }</div>`;
     return;
   }
 
@@ -133,27 +135,28 @@ function draw(): void {
   const tv = rows.reduce((s, r) => s + r.views, 0);
   const tl = rows.reduce((s, r) => s + r.leads, 0);
   const byComp = rows.slice().sort((a, b) => b.comp - a.comp);
+  const traffic = Boolean(filters.src || filters.camp || filters.ad);
 
   const seg = (name: string, cur: string, opts: [string, string][]): string =>
-    `<div class="toggle" data-seg="${name}">${opts
-      .map(([v, t]) => `<button type="button" class="toggle__seg${v === cur ? " is-active" : ""}" data-v="${v}" aria-pressed="${v === cur}">${t}</button>`)
+    `<div class="ff-seg" data-seg="${name}">${opts
+      .map(([v, t]) => `<button type="button" data-v="${v}" class="${v === cur ? "on" : ""}" aria-pressed="${v === cur}">${t}</button>`)
       .join("")}</div>`;
   const select = (name: string, all: string, cur: string, opts: [string, string][]): string =>
-    `<select class="fselect${cur ? " is-set" : ""}" data-f="${name}" aria-label="${esc(all)}"><option value="">${esc(all)}</option>${opts
+    `<select data-f="${name}" class="${cur ? "active" : ""}" aria-label="${esc(all)}"><option value="">${esc(all)}</option>${opts
       .map(([v, t]) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(t)}</option>`)
       .join("")}</select>`;
   const own = (vals: string[]): [string, string][] => vals.map((v) => [v, v]);
 
   const th = (k: SortKey, text: string, cls = ""): string =>
-    `<th data-k="${k}" class="${cls}${sort === k ? " is-sorted" : ""}">${text}</th>`;
+    `<th data-k="${k}" class="${cls}${sort === k ? " sorted" : ""}">${text}</th>`;
   const head =
-    th("name", "Form", "fcol-form") + th("views", "Views") + th("started", "Started") +
+    th("name", "Form", "form l") + th("views", "Views") + th("started", "Started") +
     cols
       .map((c) =>
-        c === "lead" ? `<th class="fstep">Form<span>Contact form</span></th>`
-        : byQ ? `<th class="fstep">${esc(label(String(c)))}<span>any position</span></th>`
-        : simple ? `<th class="fstep">Q${Number(c) + 1}<span>${esc(label(rows[0].qs[Number(c)]))}</span></th>`
-        : `<th class="fstep">Q${Number(c) + 1}<span>position</span></th>`,
+        c === "lead" ? `<th class="step">Form<span class="q">Contact form</span></th>`
+        : byQ ? `<th class="step">${esc(label(String(c)))}<span class="q">any position</span></th>`
+        : simple ? `<th class="step">Q${Number(c) + 1}<span class="q">${esc(label(rows[0].qs[Number(c)]))}</span></th>`
+        : `<th class="step">Q${Number(c) + 1}<span class="q">position</span></th>`,
       )
       .join("") +
     th("comp", "Completion") + th("leads", "Leads") + th("delta", "Δ");
@@ -167,9 +170,9 @@ function draw(): void {
         const sub = byQ ? (k === "lead" ? "last step" : `#${i + 1} of ${nq}`) : label(k);
         const val = mode === "reach" ? pct(r.reach[i]) : quit == null ? "–" : `−${pct(quit)}`;
         const shade = mode === "reach" ? r.reach[i] : quit == null ? 0 : 1 - Math.min(1, quit * 2.5);
-        return `<td class="fcell"><button type="button" class="hm${i === r.leak ? " hm--leak" : ""}" style="${cellStyle(shade)}" data-r="${ri}" data-i="${i}">${val}${simple ? "" : `<small>${esc(sub)}</small>`}</button></td>`;
+        return `<td class="cell"><div class="ff-hm${i === r.leak ? " drop" : ""}" style="${cellStyle(shade)}" data-r="${ri}" data-i="${i}">${val}${simple ? "" : `<small>${esc(sub)}</small>`}</div></td>`;
       };
-      const na = `<td class="fcell"><div class="hm hm--na">–</div></td>`;
+      const na = `<td class="cell"><div class="ff-hm na">–</div></td>`;
       const cells = cols
         .map((c) => {
           if (c === "lead") return cell(nq);
@@ -181,73 +184,81 @@ function draw(): void {
         })
         .join("");
       const d = r.delta;
+      const delta =
+        d == null ? `<span class="ff-delta">–</span>`
+        : Math.abs(d) < 0.05 ? `<span class="ff-delta">0.0</span>`
+        : `<span class="ff-delta ${d > 0 ? "up" : "down"}">${d > 0 ? "▲ +" : "▼ −"}${Math.abs(d).toFixed(1)}</span>`;
       return `<tr>
-        <td class="fcol-form" title="${esc(r.name)}"><span class="site-tag">${esc(r.site)}</span>${esc(shortName(r.name))}</td>
-        <td>${int(r.views)}</td>
-        <td>${r.started == null ? "–" : pct(r.started)}</td>
-        ${cells}
-        <td><span class="fcomp">${pct(r.comp)}<span class="fcomp__bar"><i style="width:${Math.min(100, (r.comp * 100) / 0.4)}%"></i></span></span></td>
+        <td class="form l" title="${esc(r.name)}"><span class="ff-site">${esc(r.site)}</span><span class="ff-fname ff-fname--full">${esc(r.name)}</span><span class="ff-fname ff-fname--short">${esc(shortName(r.name))}</span></td>
+        <td>${int(r.views)}</td><td>${r.started == null ? "–" : pct(r.started)}</td>${cells}
+        <td><div class="ff-comp"><span>${pct(r.comp)}</span><span class="ff-bar"><i style="width:${Math.min(100, (r.comp * 100) / 0.4)}%"></i></span></div></td>
         <td>${int(r.leads)}</td>
-        <td>${d == null ? `<span class="fdelta">–</span>`
-          : Math.abs(d) < 0.05 ? `<span class="fdelta">0.0</span>`
-          : `<span class="fdelta ${d > 0 ? "up" : "down"}">${d > 0 ? "▲ +" : "▼ −"}${Math.abs(d).toFixed(1)}</span>`}</td>
+        <td>${delta}</td>
       </tr>`;
     })
     .join("");
 
+  // Fixed widths for the number columns; the question columns share whatever
+  // is left equally, so a bigger monitor gives every question cell more room.
+  const colgroup =
+    `<colgroup><col class="c-form"><col class="c-num"><col class="c-num">` +
+    cols.map(() => `<col>`).join("") +
+    `<col class="c-comp"><col class="c-num"><col class="c-num"></colgroup>`;
+
   const kpi = (l: string, v: string, d: string, small = false): string =>
-    `<div class="fkpi"><div class="fkpi__l">${l}</div><div class="fkpi__v${small ? " fkpi__v--small" : ""}" title="${esc(v)}">${esc(v)}</div><div class="fkpi__d">${d}</div></div>`;
-  const kpis = rows.length
-    ? kpi("Page views", int(tv), `${rows.length} form${rows.length > 1 ? "s" : ""}`) +
-      kpi("Leads", int(tl), "&nbsp;") +
-      kpi("Avg completion", pct(tl / Math.max(1, tv)), "leads ÷ views") +
-      (rows.length > 1
-        ? kpi("Best form", shortName(byComp[0].name, 30), `<span class="up">▲</span> ${pct(byComp[0].comp)} completion`, true) +
-          kpi("Weakest form", shortName(byComp[byComp.length - 1].name, 30), `<span class="down">▼</span> ${pct(byComp[byComp.length - 1].comp)} completion`, true)
-        : "")
-    : "";
+    `<div class="ff-kpi"><div class="l">${l}</div><div class="v${small ? " small" : ""}" title="${esc(v)}">${esc(v)}</div><div class="d">${d}</div></div>`;
+  const best = byComp[0];
+  const worst = byComp[byComp.length - 1];
+  const kpis =
+    kpi("Page views", int(tv), `${rows.length} form${rows.length === 1 ? "" : "s"}`) +
+    kpi("Leads", int(tl), "&nbsp;") +
+    kpi("Avg completion", pct(tl / Math.max(1, tv)), "leads ÷ views") +
+    (best
+      ? kpi("Best form", best.name, `<span class="up">▲</span> ${pct(best.comp)} completion`, true) +
+        kpi("Weakest form", worst.name, `<span class="down">▼</span> ${pct(worst.comp)} completion`, true)
+      : kpi("Best form", "–", "&nbsp;", true) + kpi("Weakest form", "–", "&nbsp;", true));
 
   const badge = byQ
     ? "Layout: compare by question"
-    : simple ? `Layout: same questions on all ${rows.length} form${rows.length > 1 ? "s" : ""} (names in headers)`
+    : simple ? `Layout: same questions on all ${rows.length} form${rows.length === 1 ? "" : "s"} (names in headers)`
     : "Layout: forms differ (names inside cells)";
   const ramp = RAMP.filter((_, i) => i % 2 === 0).map((c) => `<span style="background:${c}"></span>`).join("");
-  const traffic = Boolean(filters.src || filters.camp || filters.ad);
+  const range = filters.range === 1 ? "day" : `${filters.range} days`;
 
   root.innerHTML = `
-    <section class="forms">
-      <div class="fbar">
+    <div class="forms">
+      <div class="ff-filters">
         ${seg("range", String(filters.range), [["1", "Today"], ["7", "7 days"], ["30", "30 days"]])}
-        ${seg("mode", mode, [["reach", "% reached"], ["drop", "Drop-off"], ["question", "By question"]])}
-      </div>
-      <div class="fbar">
-        ${select("site", "All sites", filters.site, sites.map((s) => [s, SITE_NAMES[s] ?? s]))}
+        ${seg("mode", mode, [["reach", "% reached"], ["drop", "Drop-off per step"], ["question", "Compare by question"]])}
+        ${select("site", "All sites", filters.site, sites.map((x) => [x, SITE_NAMES[x] ?? x]))}
         ${select("device", "All devices", filters.device, [["mobile", "Mobile"], ["desktop", "Desktop"]])}
+        <span class="ff-spacer"></span>
+        <span class="ff-sub">Click a column header to sort</span>
       </div>
-      <div class="fbar">
-        <span class="flabel">Traffic</span>
-        ${select("src", "All sources", filters.src, own(view.options.src))}
-        ${select("camp", "All campaigns", filters.camp, own(view.options.camp))}
-        ${select("ad", "All ads", filters.ad, own(view.options.ad))}
-        ${traffic ? `<button type="button" class="fclear" data-clear>Clear</button>` : ""}
+      <div class="ff-filters">
+        <span class="ff-flabel">Traffic</span>
+        <label class="ff-f"><span>Source</span>${select("src", "All sources", filters.src, own(view.options.src))}</label>
+        <label class="ff-f"><span>Campaign</span>${select("camp", "All campaigns", filters.camp, own(view.options.camp))}</label>
+        <label class="ff-f"><span>Ad</span>${select("ad", "All ads", filters.ad, own(view.options.ad))}</label>
+        ${traffic ? `<button type="button" class="ff-clear" data-clear>Clear traffic filters</button>` : ""}
+        <span class="ff-sub">${view.hidden ? `${view.hidden} form${view.hidden > 1 ? "s" : ""} hidden (no traffic matching these filters)` : ""}</span>
       </div>
-      ${view.hidden ? `<p class="fnote">${view.hidden} form${view.hidden > 1 ? "s" : ""} hidden (no traffic matching these filters)</p>` : ""}
-      ${rows.length
-        ? `<p class="fhelp"><span class="flayout${simple ? " is-simple" : ""}">${badge}</span> ${HELP[mode]}</p>
-      <div class="fkpis">${kpis}</div>
-      <section class="card ftable-card">
-        <div class="fscroll"><table class="ftable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>
-        <p class="fdetail" id="fdetail">${detail ? esc(detail) : "Tap a cell for the numbers behind it."}</p>
-        <div class="flegend">
-          <span>${mode === "reach" ? `% reached <span class="framp">${ramp}</span> 0% → 100%` : `Darker = fewer people quit <span class="framp">${ramp}</span>`}</span>
-          <span><span class="fleakkey"></span>Biggest leak in that form (min. ${MIN_LEAK_SAMPLE} people)</span>
+      <p class="ff-modehelp"><span class="ff-layout${simple ? " is-simple" : ""}">${badge}</span> ${HELP[mode]}</p>
+      <div class="ff-kpis">${kpis}</div>
+      <div class="ff-card">
+        ${rows.length
+          ? `<div class="ff-scroll"><table class="ff-table">${colgroup}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`
+          : `<p class="ff-empty">No form visits in this period${traffic || filters.site || filters.device ? " with these filters" : " yet"}.</p>`}
+        <div class="ff-legend">
+          ${mode === "reach" ? `<span>% reached <span class="ff-ramp">${ramp}</span> 0% → 100%</span>` : `<span>Darker = fewer people quit <span class="ff-ramp">${ramp}</span></span>`}
+          <span><span class="ff-dropkey"></span>Biggest leak in that form (min. ${MIN_LEAK_SAMPLE} people)</span>
           <span>Grey = form doesn't have that ${byQ ? "question" : "many questions"}</span>
-          <span>Δ = completion vs the previous ${filters.range === 1 ? "day" : `${filters.range} days`}, in points</span>
+          <span>Δ = completion vs previous ${range}, in points</span>
         </div>
-      </section>`
-        : `<section class="card"><p class="fempty">No form visits in this period${traffic || filters.site || filters.device ? " with these filters" : " yet"}.</p></section>`}
-      <p class="footnote">"Started" = answered the first question. "Completion" = leads ÷ page views. Questions only some people get (e.g. Insurer, only asked to people with insurance) are measured against the people who were shown them. Days are Sydney time; test visits on preview links are excluded.</p>
-    </section>`;
+      </div>
+      <p class="ff-notes">"Started" = answered the first question. "Completion" = leads ÷ page views. Conditional questions (e.g. Insurer, only asked to people who have insurance) are measured against the people who were actually shown them. Days are Sydney time; test visits on preview links are excluded.</p>
+      <div class="ff-tip" id="ff-tip"></div>
+    </div>`;
 
   wire(rows, label);
 }
@@ -260,7 +271,6 @@ function wire(rows: FormRow[], label: (k: string) => string): void {
       if (!b) return;
       if (g.dataset.seg === "range") filters = { ...filters, range: Number(b.dataset.v) };
       else mode = b.dataset.v as Mode;
-      detail = "";
       draw();
     });
   });
@@ -271,13 +281,11 @@ function wire(rows: FormRow[], label: (k: string) => string): void {
       // A new source or campaign resets the choices under it.
       if (k === "src") filters.camp = filters.ad = "";
       if (k === "camp") filters.ad = "";
-      detail = "";
       draw();
     });
   });
   root.querySelector("[data-clear]")?.addEventListener("click", () => {
     filters = { ...filters, src: "", camp: "", ad: "" };
-    detail = "";
     draw();
   });
   root.querySelectorAll<HTMLElement>("th[data-k]").forEach((h) => {
@@ -286,20 +294,33 @@ function wire(rows: FormRow[], label: (k: string) => string): void {
       draw();
     });
   });
-  root.querySelector(".ftable")?.addEventListener("click", (e) => {
-    const c = (e.target as HTMLElement).closest<HTMLElement>(".hm[data-r]");
-    if (!c) return;
-    const r = rows[Number(c.dataset.r)];
-    const i = Number(c.dataset.i);
+
+  // Tooltip: hover on desktop, tap on a phone.
+  const tip = root.querySelector<HTMLElement>("#ff-tip");
+  if (!tip) return;
+  const show = (el: HTMLElement, x: number, y: number): void => {
+    const r = rows[Number(el.dataset.r)];
+    const i = Number(el.dataset.i);
     const k = r.qs[i];
     const q = r.quit[i];
-    detail =
-      `${r.name} · ${k === "lead" ? "Contact form" : `Q${i + 1} ${label(k)}`}: ` +
-      `shown to ${int(r.shown[i])} (${pct(r.reach[i])} of visitors), ` +
-      `quit here ${int(r.dropped[i])}${q == null ? "" : ` (−${pct(q)})`}` +
-      (k === "insurer" ? ". Only asked to people who have insurance." : ".");
-    const el = root?.querySelector("#fdetail");
-    if (el) el.textContent = detail;
+    tip.innerHTML =
+      `<b>${esc(r.name)}</b>${k === "lead" ? "Contact form" : `Q${i + 1} · ${esc(label(k))}`}<br>` +
+      `Shown to: ${int(r.shown[i])} (${pct(r.reach[i])} of visitors)<br>` +
+      `Quit here: ${int(r.dropped[i])}${q == null ? "" : ` (−${pct(q)})`}` +
+      (k === "insurer" ? "<br><i>Only asked to people who have insurance</i>" : "");
+    tip.style.left = `${Math.min(x + 14, innerWidth - 270)}px`;
+    tip.style.top = `${y + 14}px`;
+    tip.style.opacity = "1";
+  };
+  root.querySelectorAll<HTMLElement>(".ff-hm[data-r]").forEach((el) => {
+    el.addEventListener("mousemove", (e) => show(el, e.clientX, e.clientY));
+    el.addEventListener("mouseleave", () => (tip.style.opacity = "0"));
+    el.addEventListener("click", (e) => show(el, e.clientX, e.clientY));
+  });
+  root.querySelector(".ff-scroll")?.addEventListener("scroll", () => (tip.style.opacity = "0"));
+  // Phones never fire mouseleave: a tap anywhere else closes the tooltip.
+  root.addEventListener("click", (e) => {
+    if (!(e.target as HTMLElement).closest(".ff-hm[data-r]")) tip.style.opacity = "0";
   });
 }
 

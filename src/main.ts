@@ -161,6 +161,7 @@ function render(): void {
   const s = state;
   const month = monthLabel(s.data.today.date);
   app.classList.toggle("container--wide", view === "forms");
+  document.body.classList.toggle("is-forms", view === "forms");
 
   if (view === "forms") {
     const f = formsStatus();
