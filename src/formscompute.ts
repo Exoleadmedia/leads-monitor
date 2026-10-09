@@ -87,10 +87,10 @@ export const SITE_NAMES: Record<string, string> = {
   PC: "PlainCover",
 };
 
-/** Site code from a _c_dt like goBWA_cl_compareb -> "BWA". */
+/** Site code from a _c_dt: goBWA_cl_compareb -> "BWA", newsAHC_cl_compare -> "AHC". */
 export function siteOf(formId: string): string {
-  const m = /^go([A-Za-z]+)_/.exec(formId);
-  return m ? m[1].toUpperCase() : formId.split("_")[0];
+  const head = formId.split("_")[0];
+  return head.replace(/^(go|news)(?=[A-Z])/, "").toUpperCase();
 }
 
 export function addDays(day: string, n: number): string {

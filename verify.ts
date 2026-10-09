@@ -119,6 +119,7 @@ const fv = buildFormsView(fp, all);
 const A = fv.rows.find((r) => r.id === "goBWA_cl_a")!;
 const B = fv.rows.find((r) => r.id === "goASH_cl_b")!;
 check("forms: site code", siteOf("goBWA_cl_compareb"), "BWA");
+check("forms: site code (news subdomain)", siteOf("newsAHC_cl_compare"), "AHC");
 check("forms: A name from page path", A.name, "a");
 check("forms: B name falls back to id", B.name, "goASH_cl_b");
 check("forms: A question order (insurer before coverFor)", A.qs.join(), "over60,hasInsurance,insurer,coverFor,lead");
