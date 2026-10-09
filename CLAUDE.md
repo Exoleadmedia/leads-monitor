@@ -58,6 +58,14 @@ It reads **two** spreadsheets, HD and ED (`HD_SPREADSHEET_ID`,
 percent cells to plain numbers server side. No personal data ever reaches the
 browser. Keep it that way.**
 
+The same web app also answers `?view=forms` for the **Forms tab**: it reads the
+form analytics views in Supabase (`form_funnel_detail`, `form_questions`; schema
+in `web-budgetwise-australia/sql/form-analytics.sql`) and returns per day totals
+per form, device and UTM, 60 days back. It needs two **Script Properties**
+(Project Settings, Script properties), never in code: `SUPABASE_URL` and
+`SUPABASE_SERVICE_KEY` (the legacy `service_role` key). Without them the Forms
+tab shows "Couldn't load form data" and the Leads view is unaffected.
+
 ## Sync resilience
 
 The endpoint opens two sheets and can cold start slowly, so a live fetch gets a
@@ -78,7 +86,11 @@ src/
   chartcard.ts tiles.ts flag.ts table.ts edview.ts   view components
   ui.css       design tokens, light mode only
   types.ts     the JSON contract
+  formsdata.ts    Forms tab fetch (?view=forms), cache, fixture fallback
+  formscompute.ts Forms tab maths: filters, per form funnel rows (pure)
+  formsview.ts    Forms tab render and interactions
 public/leads-sample.json    bundled fixture
+public/forms-sample.json    made up Forms tab fixture (used with no endpoint)
 apps-script/Code.gs         the Sheet side endpoint
 verify.ts                   asserts all 25 spec numbers against the fixture
 ```
@@ -104,3 +116,28 @@ total and no intraday pace, and with no `ed` key at all it shows a dash.
 Run `node verify.ts`. It runs the real compute functions against the fixture and
 asserts every number in the spec's acceptance criteria. If it passes, the maths
 still matches what the dashboard promised.
+
+## Forms tab
+
+Added 2026-10-09 per Kevin (design: `Claude outputs/form-dashboard-mockup.html`
+in the Exolead folder). Compares every tracked lead form side by side: views,
+started, % reached or quit at each question, completion, leads and the change
+vs the previous period, with filters for range, site, device and UTM source,
+campaign and ad (each list only shows what's under the choice before it).
+
+- **It never slows the Leads view.** Its data is fetched only when the tab is
+  opened (then at most every 5 minutes, or on refresh), as a separate request.
+  While it is open the header pill and refresh button follow the forms data,
+  and the 5 minute leads poll updates quietly without redrawing.
+- **Layout switches by itself:** when every visible form asks the same
+  questions in the same order, question names go in the headers; otherwise
+  columns are positions with the name inside each cell. "By question" lines up
+  the same question across forms. Question order per form comes from the whole
+  60 day payload, so columns don't reshuffle when a filter empties a question.
+- **Biggest leak** (red outline) needs at least 10 people shown the question.
+- Form names are the page path; the site badge comes from the `_c_dt` prefix
+  (`goBWA_...` is BWA). Add new site codes to `SITE_NAMES` in `formscompute.ts`.
+- `node verify.ts` includes hand checked Forms tab cases.
+- Data volume: the payload is per day per UTM combination, paged 1000 rows at
+  a time from Supabase. If it grows slow after the rollout to every site, add a
+  pre-aggregated table or a Postgres function rather than widening the range.

@@ -18,6 +18,7 @@ import { renderFlag } from "./flag.ts";
 import { renderTable } from "./table.ts";
 import { renderTiles } from "./tiles.ts";
 import { renderEdView } from "./edview.ts";
+import { formsStatus, isFormsLoading, mountForms, refreshForms, unmountForms } from "./formsview.ts";
 import type { AppState, LeadsData, SyncStatus, Vertical } from "./types.ts";
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes (§3.4)
@@ -33,6 +34,7 @@ const app = document.getElementById("app") as HTMLElement;
 let state: AppState | null = null;
 let chartMode: "cumulative" | "hourly" = "cumulative";
 let vertical: Vertical = "hd"; // which tile's detail is shown below
+let view: "leads" | "forms" = "leads"; // top tab
 let fetching = false;
 let healTimer: number | undefined; // pending self-heal retry
 let healAttempts = 0; // fast retries used since the last successful live sync
@@ -65,8 +67,28 @@ function sourceToStatus(source: AppState["source"]): SyncStatus {
 }
 
 function setPill(status: SyncStatus): void {
+  if (view === "forms") return; // the Forms tab shows its own data's status
   const el = document.getElementById("pill");
   if (el) el.innerHTML = pillHtml(status, state?.syncedAt ?? "");
+}
+
+/** Pill and refresh button follow the Forms tab's own data while it's open. */
+function syncFormsHeader(): void {
+  if (view !== "forms") return;
+  const f = formsStatus();
+  const el = document.getElementById("pill");
+  if (el) el.innerHTML = pillHtml(f.status, f.syncedAt);
+  const btn = document.getElementById("refresh") as HTMLButtonElement | null;
+  if (btn) {
+    btn.classList.toggle("is-spinning", isFormsLoading());
+    btn.disabled = isFormsLoading();
+  }
+}
+
+function tabsHtml(): string {
+  const tab = (v: "leads" | "forms", text: string): string =>
+    `<button type="button" class="toggle__seg${view === v ? " is-active" : ""}" data-view="${v}" aria-pressed="${view === v}">${text}</button>`;
+  return `<nav class="toggle tabs" aria-label="Dashboard view">${tab("leads", "Leads")}${tab("forms", "Forms")}</nav>`;
 }
 
 /** Top-right header cluster: status pill + manual "force sync" button. */
@@ -138,6 +160,28 @@ function render(): void {
   if (!state) return;
   const s = state;
   const month = monthLabel(s.data.today.date);
+  app.classList.toggle("container--wide", view === "forms");
+
+  if (view === "forms") {
+    const f = formsStatus();
+    app.innerHTML = `
+    <header class="header">
+      <div>
+        <h1 class="header__title">Leads Monitor</h1>
+        <p class="header__subtitle">Form funnels · page views to leads</p>
+      </div>
+      ${headerActions(f.status, f.syncedAt)}
+    </header>
+    ${tabsHtml()}
+    <div id="forms-root"></div>
+  `;
+    wireTabs();
+    wireRefresh();
+    mountForms(document.getElementById("forms-root") as HTMLElement, syncFormsHeader);
+    syncFormsHeader();
+    return;
+  }
+  unmountForms();
 
   const detail =
     vertical === "ed"
@@ -156,6 +200,7 @@ function render(): void {
       </div>
       ${headerActions(sourceToStatus(s.source), s.syncedAt)}
     </header>
+    ${tabsHtml()}
     ${renderTiles(s.data, vertical)}
     ${detail}
     ${footnoteHtml(s)}
@@ -166,7 +211,21 @@ function render(): void {
   drawChart();
   wireToggle();
   wireTiles();
+  wireTabs();
   wireRefresh();
+}
+
+/** Leads / Forms tabs. Forms data is only fetched once its tab is opened. */
+function wireTabs(): void {
+  app.querySelectorAll<HTMLButtonElement>(".tabs [data-view]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const v = b.dataset.view as "leads" | "forms";
+      if (v === view) return;
+      view = v;
+      destroyChart(); // the leads chart's canvas is replaced either way
+      render();
+    });
+  });
 }
 
 /** Clicking a tile switches which vertical's detail (graph/table) is shown. */
@@ -186,11 +245,15 @@ function wireTiles(): void {
 function wireRefresh(): void {
   const btn = document.getElementById("refresh") as HTMLButtonElement | null;
   if (!btn) return;
-  if (fetching) {
+  if (fetching && view === "leads") {
     btn.classList.add("is-spinning");
     btn.disabled = true;
   }
   btn.addEventListener("click", () => {
+    if (view === "forms") {
+      void refreshForms();
+      return;
+    }
     if (fetching) return;
     btn.classList.add("is-spinning");
     btn.disabled = true;
@@ -268,7 +331,8 @@ async function refresh(): Promise<void> {
   } finally {
     fetching = false;
   }
-  render();
+  // On the Forms tab the leads data updates quietly; it's drawn when Leads is reopened.
+  if (view === "leads") render();
   scheduleSelfHeal();
 }
 
@@ -320,6 +384,7 @@ function init(): void {
     if (document.visibilityState === "visible") {
       healAttempts = 0;
       void refresh();
+      if (view === "forms") void refreshForms();
     }
   });
 

@@ -84,13 +84,13 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function withCacheBust(url: string): string {
+export function withCacheBust(url: string): string {
   // Date.now() is fine in the browser; this only runs client-side.
   const sep = url.includes("?") ? "&" : "?";
   return `${url}${sep}t=${Date.now()}`;
 }
 
-async function fetchJson(url: string): Promise<unknown> {
+export async function fetchJson(url: string): Promise<unknown> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
   try {
