@@ -317,7 +317,7 @@ function draw(): void {
           <span>Δ = completion vs previous ${range}, in points</span>
         </div>
       </div>
-      <p class="ff-notes">"Started" = answered the first question. "Leads" = form submits: on most pages counted once the lead is saved, on the original BudgetWise page and ASH compare-health-cover-c as soon as the form is sent (they always go to the thank-you page), so in practice it matches the leads database. "Completion" = leads ÷ page views. Conditional questions (e.g. Insurer, only asked to people who have insurance) are measured against the people who were actually shown them. Days are Sydney time; test visits on preview links are excluded.</p>
+      <p class="ff-notes">"Started" = answered the first question. "Leads" = leads saved in the leads database (counted only once the save succeeds, on every form). "Completion" = leads ÷ page views. Conditional questions (e.g. Insurer, only asked to people who have insurance) are measured against the people who were actually shown them. Days are Sydney time; test visits on preview links are excluded.</p>
       <div class="ff-tip" id="ff-tip"></div>
     </div>`;
 
