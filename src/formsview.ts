@@ -163,7 +163,7 @@ function draw(): void {
         : `<th class="step">Q${Number(c) + 1}<span class="q">position</span></th>`,
       )
       .join("") +
-    th("comp", "Completion") + th("leads", "Leads") + th("delta", "Δ");
+    th("leads", "Leads") + th("comp", "Completion") + th("delta", "Δ");
 
   const body = rows
     .map((r, ri) => {
@@ -195,8 +195,8 @@ function draw(): void {
       return `<tr>
         <td class="form l" title="${esc(r.name)}"><span class="ff-site">${esc(r.site)}</span><span class="ff-fname ff-fname--full">${esc(r.name)}</span><span class="ff-fname ff-fname--short">${esc(shortName(r.name))}</span></td>
         <td>${int(r.views)}</td><td>${r.started == null ? "–" : pct(r.started)}</td>${cells}
-        <td><div class="ff-comp"><span>${pct(r.comp)}</span><span class="ff-bar"><i style="width:${Math.min(100, (r.comp * 100) / 0.4)}%"></i></span></div></td>
         <td>${int(r.leads)}</td>
+        <td><div class="ff-comp"><span>${pct(r.comp)}</span><span class="ff-bar"><i style="width:${Math.min(100, (r.comp * 100) / 0.4)}%"></i></span></div></td>
         <td>${delta}</td>
       </tr>`;
     })
@@ -207,7 +207,7 @@ function draw(): void {
   const colgroup =
     `<colgroup><col class="c-form"><col class="c-num"><col class="c-num">` +
     cols.map(() => `<col>`).join("") +
-    `<col class="c-comp"><col class="c-num"><col class="c-num"></colgroup>`;
+    `<col class="c-num"><col class="c-comp"><col class="c-num"></colgroup>`;
 
   // Phones: one card per form instead of the wide table. The strip has one
   // block per question (same colours as the table); tapping opens the list.
@@ -317,7 +317,7 @@ function draw(): void {
           <span>Δ = completion vs previous ${range}, in points</span>
         </div>
       </div>
-      <p class="ff-notes">"Started" = answered the first question. "Completion" = leads ÷ page views. Conditional questions (e.g. Insurer, only asked to people who have insurance) are measured against the people who were actually shown them. Days are Sydney time; test visits on preview links are excluded.</p>
+      <p class="ff-notes">"Started" = answered the first question. "Leads" = form submits: on most pages counted once the lead is saved, on the original BudgetWise page and ASH compare-health-cover-c as soon as the form is sent (they always go to the thank-you page), so in practice it matches the leads database. "Completion" = leads ÷ page views. Conditional questions (e.g. Insurer, only asked to people who have insurance) are measured against the people who were actually shown them. Days are Sydney time; test visits on preview links are excluded.</p>
       <div class="ff-tip" id="ff-tip"></div>
     </div>`;
 
