@@ -58,7 +58,7 @@ It reads **two** spreadsheets, HD and ED (`HD_SPREADSHEET_ID`,
 percent cells to plain numbers server side. No personal data ever reaches the
 browser. Keep it that way.**
 
-The **Forms tab** does not use the Apps Script. It reads
+The **Form Performance page** does not use the Apps Script. It reads
 `https://go.budgetwiseaustralia.com/api/form-stats`, a Cloudflare Pages Function
 in `Exoleadmedia/web-budgetwise-australia` that queries the Supabase form
 analytics views (schema in that repo's `sql/form-analytics.sql`) with the
@@ -66,7 +66,7 @@ Supabase key already held in that Cloudflare project, and returns per day
 totals per form, device and UTM, 60 days back. Browsers may only read it from
 `exoleadmedia.github.io` and `localhost` (CORS). Local runs without
 `VITE_DATA_URL` use `public/forms-sample.json`; `VITE_FORMS_URL` overrides the
-endpoint. If it's down the Forms tab says so and the Leads view is unaffected.
+endpoint. If it's down that page says so; the Leads Monitor is unaffected.
 
 ## Sync resilience
 
@@ -88,9 +88,12 @@ src/
   chartcard.ts tiles.ts flag.ts table.ts edview.ts   view components
   ui.css       design tokens, light mode only
   types.ts     the JSON contract
-  formsdata.ts    Forms tab fetch (/api/form-stats), cache, fixture fallback
-  formscompute.ts Forms tab maths: filters, per form funnel rows (pure)
-  formsview.ts    Forms tab render and interactions
+  shell.ts        shared header, status pill and menu (both pages)
+  forms-main.ts   Form Performance page bootstrap
+  formsdata.ts    form data fetch (/api/form-stats), cache, fixture fallback
+  formscompute.ts form funnel maths: filters, per form rows (pure)
+  formsview.ts    Form Performance render and interactions
+form-performance/index.html     the Form Performance page
 public/leads-sample.json    bundled fixture
 public/forms-sample.json    made up Forms tab fixture (used with no endpoint)
 apps-script/Code.gs         the Sheet side endpoint
@@ -119,16 +122,32 @@ Run `node verify.ts`. It runs the real compute functions against the fixture and
 asserts every number in the spec's acceptance criteria. If it passes, the maths
 still matches what the dashboard promised.
 
-## Menu
+## Two pages, one repo
 
-Leads, Forms and **Prompts** (a link to the prompt builder,
-`https://prompt-builder-d1j.pages.dev`, opening in a new tab; set in
-`PROMPT_BUILDER_URL` in `main.ts`). On desktop it's the switch under the header;
-on phones (≤700px) it's a bar fixed to the bottom of the screen, with icons, and
-the page gets extra bottom padding so nothing hides behind it. Note
-`prompt-builder.pages.dev` without the suffix is someone else's site.
+Split 2026-10-13 per Kevin, so each page only loads its own data:
 
-## Forms tab
+| Page | URL | Entry |
+|---|---|---|
+| Leads Monitor | `exoleadmedia.github.io/leads-monitor/` | `index.html` → `src/main.ts` |
+| Form Performance | `exoleadmedia.github.io/leads-monitor/form-performance/` | `form-performance/index.html` → `src/forms-main.ts` |
+
+`vite.config.ts` builds both (`rollupOptions.input`). The Leads page never
+loads forms code or `/api/form-stats`; Form Performance never loads Chart.js or
+the Apps Script. Shared header, pill and menu live in `src/shell.ts`.
+
+The menu (Leads, Forms, **Prompts**) is plain links: Leads and Forms switch
+page, Prompts opens the prompt builder (`https://prompt-builder-d1j.pages.dev`,
+`PROMPT_BUILDER_URL` in `shell.ts`) in a new tab. On desktop it's the switch
+under the header; on phones (≤700px) a bar fixed to the bottom with icons, and
+the page gets extra bottom padding. Note `prompt-builder.pages.dev` without the
+suffix is someone else's site.
+
+**Leads Monitor on desktop (≥1100px):** two columns, tiles + month strip + pace
+flag + chart on the left, the daily table on the right at the same height
+(scrolling inside its card, sticky header and total), so the whole view fits on
+one screen. Phones and narrow windows keep the single column.
+
+## Form Performance page
 
 Added 2026-10-09 per Kevin (design: `Claude outputs/form-dashboard-mockup.html`
 in the Exolead folder). Compares every tracked lead form side by side: views,
@@ -136,10 +155,12 @@ started, % reached or quit at each question, completion, leads and the change
 vs the previous period, with filters for range, site, device and UTM source,
 campaign and ad (each list only shows what's under the choice before it).
 
-- **It never slows the Leads view.** Its data is fetched only when the tab is
-  opened (then at most every 5 minutes, or on refresh), as a separate request.
-  While it is open the header pill and refresh button follow the forms data,
-  and the 5 minute leads poll updates quietly without redrawing.
+- Its own page (see above); data refreshes every 5 minutes, on refresh and
+  when the page becomes visible again.
+- Table columns: Form, Views, one per question, Contact form, **Completion**
+  (leads ÷ views, as a blue cell like the questions so the last drop-off reads
+  the same way), Leads, Δ. "Started" was removed 2026-10-13 per Kevin (it
+  duplicated Q2).
 - **Layout switches by itself:** when every visible form asks the same
   questions in the same order, question names go in the headers; otherwise
   columns are positions with the name inside each cell. "By question" lines up

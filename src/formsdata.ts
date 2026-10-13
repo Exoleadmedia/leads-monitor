@@ -13,7 +13,8 @@ const LIVE = Boolean(import.meta.env.VITE_DATA_URL);
 const FORMS_URL =
   (import.meta.env.VITE_FORMS_URL as string | undefined) ??
   (LIVE ? "https://go.budgetwiseaustralia.com/api/form-stats" : "");
-const FIXTURE_URL = `${import.meta.env.BASE_URL}forms-sample.json`;
+// The fixture sits at the site root; this page is one folder down (/form-performance/).
+const FIXTURE_URL = "../forms-sample.json";
 const CACHE_KEY = "leads-monitor:forms-last-live";
 
 export async function fetchForms(): Promise<{ data: FormsPayload; source: DataSource }> {

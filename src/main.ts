@@ -18,7 +18,7 @@ import { renderFlag } from "./flag.ts";
 import { renderTable } from "./table.ts";
 import { renderTiles } from "./tiles.ts";
 import { renderEdView } from "./edview.ts";
-import { formsStatus, isFormsLoading, mountForms, refreshForms, unmountForms } from "./formsview.ts";
+import { headerActions, menuHtml, pillHtml } from "./shell.ts";
 import type { AppState, LeadsData, SyncStatus, Vertical } from "./types.ts";
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes (§3.4)
@@ -34,7 +34,6 @@ const app = document.getElementById("app") as HTMLElement;
 let state: AppState | null = null;
 let chartMode: "cumulative" | "hourly" = "cumulative";
 let vertical: Vertical = "hd"; // which tile's detail is shown below
-let view: "leads" | "forms" = "leads"; // top tab
 let fetching = false;
 let healTimer: number | undefined; // pending self-heal retry
 let healAttempts = 0; // fast retries used since the last successful live sync
@@ -43,78 +42,13 @@ let healAttempts = 0; // fast retries used since the last successful live sync
 // Status pill (§6)
 // ---------------------------------------------------------------------------
 
-function pillHtml(status: SyncStatus, syncedAt: string): string {
-  const t = clockHHMM(syncedAt);
-  let cls = "pill--live";
-  let text = `Live · synced ${t}`;
-  if (status === "syncing") {
-    cls = "pill--syncing";
-    text = "Syncing…";
-  } else if (status === "cached") {
-    // Last good live data replayed from this device (sync is currently failing).
-    cls = "pill--snapshot";
-    text = `Offline · last synced${t ? ` ${t}` : ""}`;
-  } else if (status === "snapshot") {
-    // Bundled sample — only shown when there's no live data or cache at all.
-    cls = "pill--snapshot";
-    text = "Sample data";
-  }
-  return `<span class="pill ${cls}"><span class="pill__dot"></span>${text}</span>`;
-}
-
 function sourceToStatus(source: AppState["source"]): SyncStatus {
   return source === "live" ? "live" : source === "cache" ? "cached" : "snapshot";
 }
 
 function setPill(status: SyncStatus): void {
-  if (view === "forms") return; // the Forms tab shows its own data's status
   const el = document.getElementById("pill");
   if (el) el.innerHTML = pillHtml(status, state?.syncedAt ?? "");
-}
-
-/** Pill and refresh button follow the Forms tab's own data while it's open. */
-function syncFormsHeader(): void {
-  if (view !== "forms") return;
-  const f = formsStatus();
-  const el = document.getElementById("pill");
-  if (el) el.innerHTML = pillHtml(f.status, f.syncedAt);
-  const btn = document.getElementById("refresh") as HTMLButtonElement | null;
-  if (btn) {
-    btn.classList.toggle("is-spinning", isFormsLoading());
-    btn.disabled = isFormsLoading();
-  }
-}
-
-const PROMPT_BUILDER_URL = "https://prompt-builder-d1j.pages.dev/";
-
-const ICONS = {
-  leads: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg>`,
-  forms: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>`,
-  prompts: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>`,
-};
-
-/** Main menu: a segmented switch at the top on desktop, a bar fixed to the bottom on phones. */
-function tabsHtml(): string {
-  const tab = (v: "leads" | "forms", text: string): string =>
-    `<button type="button" class="toggle__seg tabs__item${view === v ? " is-active" : ""}" data-view="${v}" aria-pressed="${view === v}">${ICONS[v]}<span>${text}</span></button>`;
-  return `<nav class="toggle tabs" aria-label="Dashboard view">${tab("leads", "Leads")}${tab("forms", "Forms")}<a class="toggle__seg tabs__item tabs__link" href="${PROMPT_BUILDER_URL}" target="_blank" rel="noopener">${ICONS.prompts}<span>Prompts</span></a></nav>`;
-}
-
-/** Top-right header cluster: status pill + manual "force sync" button. */
-function headerActions(status: SyncStatus, syncedAt: string): string {
-  return `
-    <div class="header__actions">
-      <div id="pill">${pillHtml(status, syncedAt)}</div>
-      <button id="refresh" class="refresh-btn" type="button"
-              aria-label="Refresh now" title="Refresh now">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round"
-             stroke-linejoin="round" aria-hidden="true">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </svg>
-      </button>
-    </div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,38 +103,20 @@ function render(): void {
   if (!state) return;
   const s = state;
   const month = monthLabel(s.data.today.date);
-  app.classList.toggle("container--wide", view === "forms");
-  document.body.classList.toggle("is-forms", view === "forms");
 
-  if (view === "forms") {
-    const f = formsStatus();
-    app.innerHTML = `
-    <header class="header">
-      <div>
-        <h1 class="header__title">Leads Monitor</h1>
-        <p class="header__subtitle">Form funnels · page views to leads</p>
-      </div>
-      ${headerActions(f.status, f.syncedAt)}
-    </header>
-    ${tabsHtml()}
-    <div id="forms-root"></div>
-  `;
-    wireTabs();
-    wireRefresh();
-    mountForms(document.getElementById("forms-root") as HTMLElement, syncFormsHeader);
-    syncFormsHeader();
-    return;
-  }
-  unmountForms();
-
+  // Summary (tiles, strip, pace, chart) and the daily table. On desktop they sit
+  // side by side so everything fits on one screen; on phones they stack.
   const detail =
     vertical === "ed"
       ? renderEdView(s.data, chartMode)
-      : `${stripHtml(s.data)}${renderFlag(
-          s.data.today.cumulative,
-          s.data.benchmark.high,
-          s.data.benchmark.low,
-        )}${chartCardHtml(s.data.today.date, chartMode, true)}${renderTable(s.data)}`;
+      : {
+          main: `${stripHtml(s.data)}${renderFlag(
+            s.data.today.cumulative,
+            s.data.benchmark.high,
+            s.data.benchmark.low,
+          )}${chartCardHtml(s.data.today.date, chartMode, true)}`,
+          side: renderTable(s.data),
+        };
 
   app.innerHTML = `
     <header class="header">
@@ -210,9 +126,14 @@ function render(): void {
       </div>
       ${headerActions(sourceToStatus(s.source), s.syncedAt)}
     </header>
-    ${tabsHtml()}
-    ${renderTiles(s.data, vertical)}
-    ${detail}
+    ${menuHtml("leads", "./")}
+    <div class="leads-grid">
+      <div class="leads-main">
+        ${renderTiles(s.data, vertical)}
+        ${detail.main}
+      </div>
+      ${detail.side ? `<div class="leads-side"><div class="leads-side__inner">${detail.side}</div></div>` : ""}
+    </div>
     ${footnoteHtml(s)}
   `;
 
@@ -221,21 +142,7 @@ function render(): void {
   drawChart();
   wireToggle();
   wireTiles();
-  wireTabs();
   wireRefresh();
-}
-
-/** Leads / Forms tabs. Forms data is only fetched once its tab is opened. */
-function wireTabs(): void {
-  app.querySelectorAll<HTMLButtonElement>(".tabs [data-view]").forEach((b) => {
-    b.addEventListener("click", () => {
-      const v = b.dataset.view as "leads" | "forms";
-      if (v === view) return;
-      view = v;
-      destroyChart(); // the leads chart's canvas is replaced either way
-      render();
-    });
-  });
 }
 
 /** Clicking a tile switches which vertical's detail (graph/table) is shown. */
@@ -255,15 +162,11 @@ function wireTiles(): void {
 function wireRefresh(): void {
   const btn = document.getElementById("refresh") as HTMLButtonElement | null;
   if (!btn) return;
-  if (fetching && view === "leads") {
+  if (fetching) {
     btn.classList.add("is-spinning");
     btn.disabled = true;
   }
   btn.addEventListener("click", () => {
-    if (view === "forms") {
-      void refreshForms();
-      return;
-    }
     if (fetching) return;
     btn.classList.add("is-spinning");
     btn.disabled = true;
@@ -298,7 +201,8 @@ function drawChart(): void {
 }
 
 function wireToggle(): void {
-  const segs = app.querySelectorAll<HTMLButtonElement>(".toggle__seg");
+  // Only the chart's Cumulative / Per hour buttons (the menu shares the class).
+  const segs = app.querySelectorAll<HTMLButtonElement>(".toggle__seg[data-mode]");
   segs.forEach((btn) => {
     btn.addEventListener("click", () => {
       const mode = btn.dataset.mode as "cumulative" | "hourly";
@@ -341,8 +245,7 @@ async function refresh(): Promise<void> {
   } finally {
     fetching = false;
   }
-  // On the Forms tab the leads data updates quietly; it's drawn when Leads is reopened.
-  if (view === "leads") render();
+  render();
   scheduleSelfHeal();
 }
 
@@ -394,7 +297,6 @@ function init(): void {
     if (document.visibilityState === "visible") {
       healAttempts = 0;
       void refresh();
-      if (view === "forms") void refreshForms();
     }
   });
 

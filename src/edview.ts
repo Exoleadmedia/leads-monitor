@@ -152,10 +152,11 @@ function rowHtml(row: EdRow, median: number | null, isToday: boolean): string {
   `;
 }
 
-export function renderEdView(data: LeadsData, chartMode: ChartMode): string {
+/** ED detail as two parts: `main` (strip, pace, chart) and `side` (daily table). */
+export function renderEdView(data: LeadsData, chartMode: ChartMode): { main: string; side: string } {
   const ed = data.ed;
   if (!ed || ed.daily.length === 0) {
-    return `
+    return { side: "", main: `
       <section class="card">
         <div class="card__title">ED Leads</div>
         <p class="footnote" style="text-align:left;margin-top:6px">
@@ -163,7 +164,7 @@ export function renderEdView(data: LeadsData, chartMode: ChartMode): string {
           ED sheet's current month tab) to populate this view.
         </p>
       </section>
-    `;
+    ` };
   }
   const agg = edAggregate(ed.daily);
   const flag = ed.cumulative && ed.benchmark
@@ -172,7 +173,7 @@ export function renderEdView(data: LeadsData, chartMode: ChartMode): string {
   const chart = ed.cumulative
     ? chartCardHtml(ed.date || data.today.date, chartMode, ed.benchmark != null)
     : "";
-  return `${stripHtml(ed, agg)}${flag}${chart}${tableHtml(ed, agg)}`;
+  return { main: `${stripHtml(ed, agg)}${flag}${chart}`, side: tableHtml(ed, agg) };
 }
 
 function esc(s: string): string {

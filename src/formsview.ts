@@ -154,7 +154,7 @@ function draw(): void {
   const th = (k: SortKey, text: string, cls = ""): string =>
     `<th data-k="${k}" class="${cls}${sort === k ? " sorted" : ""}">${text}</th>`;
   const head =
-    th("name", "Form", "form l") + th("views", "Views") + th("started", "Started") +
+    th("name", "Form", "form l") + th("views", "Views") +
     cols
       .map((c) =>
         c === "lead" ? `<th class="step">Form<span class="q">Contact form</span></th>`
@@ -163,7 +163,9 @@ function draw(): void {
         : `<th class="step">Q${Number(c) + 1}<span class="q">position</span></th>`,
       )
       .join("") +
-    th("leads", "Leads") + th("comp", "Completion") + th("delta", "Δ");
+    // Completion sits right after the contact form, in the same blue cell style,
+    // so the last drop-off (contact form -> lead saved) reads like the others.
+    th("comp", 'Completion<span class="q">leads ÷ views</span>', "step") + th("leads", "Leads") + th("delta", "Δ");
 
   const body = rows
     .map((r, ri) => {
@@ -194,9 +196,9 @@ function draw(): void {
         : `<span class="ff-delta ${d > 0 ? "up" : "down"}">${d > 0 ? "▲ +" : "▼ −"}${Math.abs(d).toFixed(1)}</span>`;
       return `<tr>
         <td class="form l" title="${esc(r.name)}"><span class="ff-site">${esc(r.site)}</span><span class="ff-fname ff-fname--full">${esc(r.name)}</span><span class="ff-fname ff-fname--short">${esc(shortName(r.name))}</span></td>
-        <td>${int(r.views)}</td><td>${r.started == null ? "–" : pct(r.started)}</td>${cells}
+        <td>${int(r.views)}</td>${cells}
+        <td class="cell"><div class="ff-hm ff-hm--comp" style="${cellStyle(r.comp)}">${pct(r.comp)}${simple ? "" : "<small>Completion</small>"}</div></td>
         <td>${int(r.leads)}</td>
-        <td><div class="ff-comp"><span>${pct(r.comp)}</span><span class="ff-bar"><i style="width:${Math.min(100, (r.comp * 100) / 0.4)}%"></i></span></div></td>
         <td>${delta}</td>
       </tr>`;
     })
@@ -205,13 +207,13 @@ function draw(): void {
   // Fixed widths for the number columns; the question columns share whatever
   // is left equally, so a bigger monitor gives every question cell more room.
   const colgroup =
-    `<colgroup><col class="c-form"><col class="c-num"><col class="c-num">` +
+    `<colgroup><col class="c-form"><col class="c-num">` +
     cols.map(() => `<col>`).join("") +
-    `<col class="c-num"><col class="c-comp"><col class="c-num"></colgroup>`;
+    `<col><col class="c-num"><col class="c-num"></colgroup>`;
 
   // Phones: one card per form instead of the wide table. The strip has one
   // block per question (same colours as the table); tapping opens the list.
-  const sortOpts: [SortKey, string][] = [["comp", "Completion"], ["views", "Views"], ["leads", "Leads"], ["started", "Started"], ["delta", "Change"], ["name", "Name"]];
+  const sortOpts: [SortKey, string][] = [["comp", "Completion"], ["views", "Views"], ["leads", "Leads"], ["delta", "Change"], ["name", "Name"]];
   const cards = `<div class="ff-cards ff-phone">
       <label class="ff-sort">Sort by <select data-sort>${sortOpts
         .map(([k, t]) => `<option value="${k}"${k === sort ? " selected" : ""}>${t}</option>`)
@@ -248,7 +250,6 @@ function draw(): void {
               <div class="ff-fc__head"><span class="ff-site">${esc(r.site)}</span><span class="ff-fc__name">${esc(r.name)}</span>${delta}</div>
               <div class="ff-fc__stats">
                 <span><b>${int(r.views)}</b> views</span>
-                <span><b>${r.started == null ? "–" : pct(r.started)}</b> started</span>
                 <span><b>${int(r.leads)}</b> leads</span>
                 <span class="ff-fc__comp"><b>${pct(r.comp)}</b><span class="ff-bar"><i style="width:${Math.min(100, (r.comp * 100) / 0.4)}%"></i></span></span>
               </div>
@@ -317,7 +318,7 @@ function draw(): void {
           <span>Δ = completion vs previous ${range}, in points</span>
         </div>
       </div>
-      <p class="ff-notes">"Started" = answered the first question. "Leads" = leads saved in the leads database (counted only once the save succeeds, on every form). "Completion" = leads ÷ page views. Conditional questions (e.g. Insurer, only asked to people who have insurance) are measured against the people who were actually shown them. Days are Sydney time; test visits on preview links are excluded.</p>
+      <p class="ff-notes">"Leads" = leads saved in the leads database (counted only once the save succeeds, on every form). "Completion" = leads ÷ page views. Conditional questions (e.g. Insurer, only asked to people who have insurance) are measured against the people who were actually shown them. Days are Sydney time; test visits on preview links are excluded.</p>
       <div class="ff-tip" id="ff-tip"></div>
     </div>`;
 
