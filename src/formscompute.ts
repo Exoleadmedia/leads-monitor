@@ -63,6 +63,7 @@ export interface FormRow {
   id: string;
   site: string; // short code, e.g. "BWA"
   name: string; // page path without the leading slash
+  url: string | null; // the live page, when its site's domain is known
   views: number;
   leads: number;
   comp: number; // leads / views
@@ -78,6 +79,13 @@ export interface FormRow {
 
 // A question needs this many people shown it before it can be "the biggest leak".
 export const MIN_LEAK_SAMPLE = 10;
+
+/** Live domain per site code, for the "open the page" links. */
+export const SITE_HOSTS: Record<string, string> = {
+  BWA: "go.budgetwiseaustralia.com",
+  ASH: "go.australianseniorhealth.com",
+  AHC: "news.australiahealthcare.org",
+};
 
 export const SITE_NAMES: Record<string, string> = {
   BWA: "BudgetWise",
@@ -224,10 +232,12 @@ export function buildFormsView(p: FormsPayload, filters: Filters): FormsView {
     const comp = t.leads / t.views;
     const pt = prev.get(id);
     const path = paths.get(id);
+    const host = SITE_HOSTS[siteOf(id)];
     rows.push({
       id,
       site: siteOf(id),
       name: path ? path.replace(/^\//, "") : id,
+      url: path && host ? `https://${host}${path}` : null,
       views: t.views,
       leads: t.leads,
       comp,

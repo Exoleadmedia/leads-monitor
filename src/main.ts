@@ -124,9 +124,9 @@ function render(): void {
         <h1 class="header__title">Leads Monitor</h1>
         <p class="header__subtitle">${esc(month)} · today vs typical day</p>
       </div>
+      ${menuHtml("leads", "./")}
       ${headerActions(sourceToStatus(s.source), s.syncedAt)}
     </header>
-    ${menuHtml("leads", "./")}
     <div class="leads-grid">
       <div class="leads-main">
         ${renderTiles(s.data, vertical)}

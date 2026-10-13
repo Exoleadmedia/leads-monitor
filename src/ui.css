@@ -646,10 +646,16 @@ body {
 
 /* ------------------------------------------------------------ Tabs/Forms */
 
-/* Leads / Forms switch: a visible track, since it sits on the page, not a card. */
+/* Main menu: sits in the header row, after the title, on desktop (on phones it
+   becomes the bottom bar, see the max-width: 700px block). */
 .tabs {
-  align-self: flex-start;
+  align-self: center;
   background: var(--line);
+}
+
+.header .tabs {
+  margin-left: 20px;
+  margin-right: auto;
 }
 
 /* The Forms tab uses the whole window (it's mostly read on desktop): wider
@@ -859,7 +865,7 @@ body.is-forms {
 }
 
 .ff-table col.c-form {
-  width: 280px;
+  width: 330px;
 }
 
 .ff-table col.c-num {
@@ -940,13 +946,41 @@ body.is-forms {
   background: var(--ff-surface);
   z-index: 1;
   min-width: 250px;
-  max-width: 300px;
+  max-width: 360px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .ff-table thead th.form {
   z-index: 2;
+}
+
+.ff-formcell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ff-formcell .ff-fname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ff-open {
+  flex: none;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--ff-accent);
+  text-decoration: none;
+}
+
+.ff-open:hover,
+.ff-open:focus-visible {
+  background: var(--ff-chip);
 }
 
 .ff-site {
@@ -1397,6 +1431,10 @@ body.is-forms {
 
   .tabs__link::after {
     display: none;
+  }
+
+  .header .tabs {
+    margin: 0;
   }
 
   /* Room under the content for the bar. */

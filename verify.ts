@@ -122,6 +122,8 @@ check("forms: site code", siteOf("goBWA_cl_compareb"), "BWA");
 check("forms: site code (news subdomain)", siteOf("newsAHC_cl_compare"), "AHC");
 check("forms: A name from page path", A.name, "a");
 check("forms: B name falls back to id", B.name, "goASH_cl_b");
+check("forms: A page link", A.url, "https://go.budgetwiseaustralia.com/a");
+check("forms: no link without a page path", B.url, null);
 check("forms: A question order (insurer before coverFor)", A.qs.join(), "over60,hasInsurance,insurer,coverFor,lead");
 check("forms: A views/leads (7 days)", `${A.views}/${A.leads}`, "14/3");
 check("forms: A shown", A.shown.join(), "14,11,5,10,9");

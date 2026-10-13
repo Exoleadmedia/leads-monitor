@@ -30,9 +30,9 @@ function init(): void {
         <h1 class="header__title">Form Performance</h1>
         <p class="header__subtitle">Form funnels · page views to leads</p>
       </div>
+      ${menuHtml("forms", "../")}
       ${headerActions(f.status, f.syncedAt)}
     </header>
-    ${menuHtml("forms", "../")}
     <div id="forms-root"></div>
   `;
   document.getElementById("refresh")?.addEventListener("click", () => void refreshForms());

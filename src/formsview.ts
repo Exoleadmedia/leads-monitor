@@ -89,6 +89,17 @@ function cellStyle(p: number): string {
   return `background:${RAMP[i]};color:${i >= 6 ? "#fff" : "#0b0b0b"}`;
 }
 
+/**
+ * Small arrow that opens the live form page in a new tab. Tagged
+ * utm_source=dashboard so these visits can be told apart (and filtered out)
+ * in the Traffic filter.
+ */
+function openLink(r: FormRow): string {
+  if (!r.url) return "";
+  const href = `${r.url}?utm_source=dashboard`;
+  return `<a class="ff-open" href="${esc(href)}" target="_blank" rel="noopener" title="Open ${esc(r.name)} in a new tab" aria-label="Open ${esc(r.name)} in a new tab">↗</a>`;
+}
+
 /** Long page names differ at the end (-b, -c), so cut the middle, not the end. */
 function shortName(name: string, max = 26): string {
   return name.length <= max ? name : `${name.slice(0, 9)}…${name.slice(-(max - 10))}`;
@@ -195,7 +206,7 @@ function draw(): void {
         : Math.abs(d) < 0.05 ? `<span class="ff-delta">0.0</span>`
         : `<span class="ff-delta ${d > 0 ? "up" : "down"}">${d > 0 ? "▲ +" : "▼ −"}${Math.abs(d).toFixed(1)}</span>`;
       return `<tr>
-        <td class="form l" title="${esc(r.name)}"><span class="ff-site">${esc(r.site)}</span><span class="ff-fname ff-fname--full">${esc(r.name)}</span><span class="ff-fname ff-fname--short">${esc(shortName(r.name))}</span></td>
+        <td class="form l" title="${esc(r.name)}"><div class="ff-formcell"><span class="ff-site">${esc(r.site)}</span><span class="ff-fname ff-fname--full">${esc(r.name)}</span><span class="ff-fname ff-fname--short">${esc(shortName(r.name))}</span>${openLink(r)}</div></td>
         <td>${int(r.views)}</td>${cells}
         <td class="cell"><div class="ff-hm ff-hm--comp" style="${cellStyle(r.comp)}">${pct(r.comp)}${simple ? "" : "<small>Completion</small>"}</div></td>
         <td>${int(r.leads)}</td>
@@ -247,7 +258,7 @@ function draw(): void {
             : `<span class="ff-delta ${d > 0 ? "up" : "down"}">${d > 0 ? "▲ +" : "▼ −"}${Math.abs(d).toFixed(1)}</span>`;
           return `<details class="ff-fc" data-id="${esc(r.id)}"${openCards.has(r.id) ? " open" : ""}>
             <summary>
-              <div class="ff-fc__head"><span class="ff-site">${esc(r.site)}</span><span class="ff-fc__name">${esc(r.name)}</span>${delta}</div>
+              <div class="ff-fc__head"><span class="ff-site">${esc(r.site)}</span><span class="ff-fc__name">${esc(r.name)}${openLink(r)}</span>${delta}</div>
               <div class="ff-fc__stats">
                 <span><b>${int(r.views)}</b> views</span>
                 <span><b>${int(r.leads)}</b> leads</span>

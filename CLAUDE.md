@@ -137,8 +137,8 @@ the Apps Script. Shared header, pill and menu live in `src/shell.ts`.
 
 The menu (Leads, Forms, **Prompts**) is plain links: Leads and Forms switch
 page, Prompts opens the prompt builder (`https://prompt-builder-d1j.pages.dev`,
-`PROMPT_BUILDER_URL` in `shell.ts`) in a new tab. On desktop it's the switch
-under the header; on phones (≤700px) a bar fixed to the bottom with icons, and
+`PROMPT_BUILDER_URL` in `shell.ts`) in a new tab. On desktop it sits in the
+header row, right after the page title (per Kevin, 2026-10-13); on phones (≤700px) a bar fixed to the bottom with icons, and
 the page gets extra bottom padding. Note `prompt-builder.pages.dev` without the
 suffix is someone else's site.
 
@@ -179,7 +179,11 @@ campaign and ad (each list only shows what's under the choice before it).
   CSS shows one (`.ff-desktop` / `.ff-phone`).
 - **Biggest leak** (red outline) needs at least 10 people shown the question.
 - Form names are the page path; the site badge comes from the `_c_dt` prefix
-  (`goBWA_...` is BWA). Add new site codes to `SITE_NAMES` in `formscompute.ts`.
+  (`goBWA_...` is BWA, `newsAHC_...` is AHC). Add new site codes to
+  `SITE_NAMES` and their live domain to `SITE_HOSTS` in `formscompute.ts`.
+- The small ↗ after each form name opens the live page in a new tab, tagged
+  `?utm_source=dashboard`, so those visits show up as their own source in the
+  Traffic filter (pick another source, or exclude it, to keep them out).
 - `node verify.ts` includes hand checked form funnel cases.
 - Data volume: the payload is per day per UTM combination, paged 1000 rows at
   a time from Supabase by `/api/form-stats`. If it grows slow after the rollout to every site, add a
