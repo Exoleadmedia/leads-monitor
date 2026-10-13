@@ -52,7 +52,10 @@ export const NONE = "(none)";
 export type Mode = "reach" | "drop" | "question";
 export type SortKey = "name" | "views" | "comp" | "leads" | "delta";
 
+export type Vertical = "hd" | "ed";
+
 export interface Filters {
+  vertical?: Vertical; // health (default) or energy forms
   range: number; // days ending today (1, 7 or 30); 0 = custom from/to
   from?: string; // custom range start, "YYYY-MM-DD" (Sydney day)
   to?: string; // custom range end, inclusive
@@ -84,11 +87,25 @@ export interface FormRow {
 export const MIN_LEAK_SAMPLE = 10;
 
 /** Live domain per site code, for the "open the page" links. */
-export const SITE_HOSTS: Record<string, string> = {
-  BWA: "go.budgetwiseaustralia.com",
-  ASH: "go.australianseniorhealth.com",
-  AHC: "news.australiahealthcare.org",
+/**
+ * Live domain per form ID prefix (the part before the first "_"), for the
+ * "open the page" links. Prefix, not site code: energy runs the same brand on
+ * two domains (goEPA_ on go., EPA_ on the bare domain).
+ */
+export const FORM_HOSTS: Record<string, string> = {
+  goBWA: "go.budgetwiseaustralia.com",
+  goASH: "go.australianseniorhealth.com",
+  newsAHC: "news.australiahealthcare.org",
+  goEPA: "go.energyplanaustralia.com",
+  EPA: "energyplanaustralia.com",
 };
+
+/** Site codes that are energy (ED); every other site is health (HD). */
+export const ENERGY_SITES = new Set(["EPA"]);
+
+export function verticalOf(formId: string): Vertical {
+  return ENERGY_SITES.has(siteOf(formId)) ? "ed" : "hd";
+}
 
 export const SITE_NAMES: Record<string, string> = {
   BWA: "BudgetWise",
@@ -96,6 +113,7 @@ export const SITE_NAMES: Record<string, string> = {
   ASC: "Aus Senior Cover",
   AHC: "AustraliaHealthcare",
   PC: "PlainCover",
+  EPA: "Energy Plan Australia",
 };
 
 /** Site code from a _c_dt: goBWA_cl_compareb -> "BWA", newsAHC_cl_compare -> "AHC". */
@@ -119,6 +137,7 @@ function inWindow(p: FormsPayload, f: Filters, from: string, to: string): FormsG
     (g) =>
       g.d >= from &&
       g.d <= to &&
+      verticalOf(g.f) === (f.vertical ?? "hd") &&
       (!f.site || siteOf(g.f) === f.site) &&
       (!f.device || g.dev === f.device),
   );
@@ -256,7 +275,7 @@ export function buildFormsView(p: FormsPayload, filters: Filters): FormsView {
     const comp = t.leads / t.views;
     const pt = prev.get(id);
     const path = paths.get(id);
-    const host = SITE_HOSTS[siteOf(id)];
+    const host = FORM_HOSTS[id.split("_")[0]];
     rows.push({
       id,
       site: siteOf(id),
@@ -313,7 +332,7 @@ export interface Breakdown {
  */
 export function formDetail(p: FormsPayload, f: Filters, formId: string): { devices: Breakdown[]; sources: Breakdown[] } {
   const { from, to } = periodOf(p, f);
-  const mine = p.groups.filter((g) => g.f === formId && g.d >= from && g.d <= to && (!f.site || siteOf(g.f) === f.site));
+  const mine = p.groups.filter((g) => g.f === formId && g.d >= from && g.d <= to);
   const sum = (groups: FormsGroup[], key: (g: FormsGroup) => string): Breakdown[] => {
     const m = new Map<string, Breakdown>();
     for (const g of groups) {

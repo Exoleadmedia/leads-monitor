@@ -5,6 +5,7 @@
 
 import {
   buildFormsView,
+  verticalOf,
   formDetail,
   MIN_LEAK_SAMPLE,
   periodOf,
@@ -14,7 +15,7 @@ import {
   sortRows,
 } from "./formscompute.ts";
 import { fetchForms } from "./formsdata.ts";
-import type { Breakdown, Filters, FormRow, FormsPayload, Mode, SortKey } from "./formscompute.ts";
+import type { Breakdown, Filters, FormRow, FormsPayload, Mode, SortKey, Vertical } from "./formscompute.ts";
 import type { DataSource, SyncStatus } from "./types.ts";
 
 const STALE_MS = 5 * 60 * 1000;
@@ -27,7 +28,9 @@ let failed = false;
 let root: HTMLElement | null = null;
 let onStatus: (() => void) | null = null;
 
-let filters: Filters = { range: 7, site: "", device: "", src: "", camp: "", ad: "" };
+// Health (HD) or energy (ED) forms; "#ed" in the URL opens straight on energy.
+const startVertical: Vertical = location.hash === "#ed" ? "ed" : "hd";
+let filters: Filters = { vertical: startVertical, range: 7, site: "", device: "", src: "", camp: "", ad: "" };
 let mode: Mode = "reach";
 let sort: SortKey = "comp";
 let panelOpen = false; // filter panel (desktop dropdown, phone bottom sheet)
@@ -148,7 +151,8 @@ function draw(): void {
   const cols: (number | string)[] = byQ
     ? [...byQKeys, "lead"]
     : [...Array(simple ? rows[0].qs.length - 1 : maxQ).keys(), "lead"];
-  const sites = [...new Set(p.groups.map((g) => siteOf(g.f)))].sort();
+  const vertical = filters.vertical ?? "hd";
+  const sites = [...new Set(p.groups.filter((g) => verticalOf(g.f) === vertical).map((g) => siteOf(g.f)))].sort();
   const tv = rows.reduce((s, r) => s + r.views, 0);
   const tl = rows.reduce((s, r) => s + r.leads, 0);
   const traffic = Boolean(filters.src || filters.camp || filters.ad);
@@ -165,16 +169,29 @@ function draw(): void {
     return `<button type="button" data-range="${v}" class="${on ? "on" : ""}" aria-pressed="${on}">${t}</button>`;
   };
   const summary = [
+    (periodText.replace(/^the /, "").charAt(0).toUpperCase() + periodText.replace(/^the /, "").slice(1)),
     filters.site ? SITE_NAMES[filters.site] ?? filters.site : "All sites",
     filters.device ? (filters.device === "mobile" ? "Mobile" : "Desktop") : "All devices",
     traffic ? [filters.src, filters.camp, filters.ad].filter(Boolean).join(" › ") : "All traffic",
   ].join(" · ");
+  // Health / energy tiles: each shows its own summary for the period and the
+  // other filters (a site filter only applies to its own vertical).
+  const verticalTile = (v: Vertical, name: string, code: string): string => {
+    const t = v === vertical ? { rows, tv, tl } : (() => {
+      const other = buildFormsView(p, { ...filters, vertical: v, site: "" }).rows;
+      return { rows: other, tv: other.reduce((s, r) => s + r.views, 0), tl: other.reduce((s, r) => s + r.leads, 0) };
+    })();
+    const on = v === vertical;
+    return `<button type="button" class="ff-vtile${on ? " on" : ""}" data-vertical="${v}" aria-pressed="${on}">
+      <span class="ff-vtile__name">${name} <span class="ff-vtile__code">${code}</span></span>
+      ${t.rows.length
+        ? `<span class="ff-vtile__big">${pct(t.tl / Math.max(1, t.tv))}</span><span class="ff-vtile__sub">${plural(t.tl, "lead")} from ${int(t.tv)} views · ${plural(t.rows.length, "form")}</span>`
+        : `<span class="ff-vtile__big">–</span><span class="ff-vtile__sub">No tracked forms ${t.rows.length === 0 && filtered ? "match these filters" : "yet"}</span>`}
+    </button>`;
+  };
   const band = `
     <section class="ff-band">
-      <div class="ff-band__stats">
-        <span class="ff-band__big">${pct(tl / Math.max(1, tv))}</span>
-        <span class="ff-band__sub">of ${int(tv)} visitors became leads <span class="ff-band__when">in ${esc(periodText)}</span><br>${plural(tl, "lead")} across ${plural(rows.length, "form")}</span>
-      </div>
+      <div class="ff-vtiles" role="group" aria-label="Vertical">${verticalTile("hd", "Health", "HD")}${verticalTile("ed", "Energy", "ED")}</div>
       <div class="ff-band__controls">
         <div class="ff-bseg" role="group" aria-label="Period">${rangeBtn("1", "Today")}${rangeBtn("7", "7 days")}${rangeBtn("30", "30 days")}${rangeBtn("0", "Custom")}</div>
         <button type="button" class="ff-bfilter${filtered ? " is-on" : ""}" data-panel aria-expanded="${panelOpen}">${ICON_FILTER}<span class="ff-bfilter__label">Filters</span>${filtered ? `<span class="ff-dot" aria-hidden="true"></span>` : ""}</button>
@@ -375,6 +392,14 @@ function wire(rows: FormRow[], label: (k: string) => string): void {
     const v = (el as HTMLInputElement).value;
     if (!v) return;
     filters = { ...filters, [el.dataset.date as "from" | "to"]: v };
+    draw();
+  });
+  on("[data-vertical]", "click", (el) => {
+    const v = el.dataset.vertical as Vertical;
+    if (v === (filters.vertical ?? "hd")) return;
+    // A site, campaign or ad from the other vertical would match nothing here.
+    filters = { ...filters, vertical: v, site: "", src: "", camp: "", ad: "" };
+    history.replaceState(null, "", v === "ed" ? "#ed" : location.pathname + location.search);
     draw();
   });
   on("[data-panel]", "click", () => { panelOpen = !panelOpen; draw(); });

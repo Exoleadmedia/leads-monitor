@@ -157,6 +157,13 @@ campaign and ad (each list only shows what's under the choice before it).
 
 - Its own page (see above); data refreshes every 5 minutes, on refresh and
   when the page becomes visible again.
+- **Health / energy switch** (per Kevin, 2026-10-13): the left of the band is
+  two tiles, Health (HD) and Energy (ED), each with its own completion, leads
+  and views for the period; clicking one switches the whole page (table,
+  filters, comparison). `#ed` in the URL opens on energy. The vertical comes
+  from the form ID's site code: `ENERGY_SITES` in `formscompute.ts` (EPA), every
+  other site is health. Page links use `FORM_HOSTS`, keyed by the ID prefix
+  (`goEPA` and `EPA` are different domains).
 - **Top band** (per Kevin, 2026-10-13, from mobile design "D"): navy band with
   the period's completion %, views and leads, the date switch (Today, 7 days,
   30 days, **Custom** with From/To pickers limited to the 60 days the feed

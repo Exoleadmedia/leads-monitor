@@ -15,7 +15,7 @@ import {
   typicalLine,
 } from "./src/compute.ts";
 import type { LeadsData } from "./src/types.ts";
-import { buildFormsView, formDetail, NONE, sameQuestions, siteOf, sortRows } from "./src/formscompute.ts";
+import { buildFormsView, formDetail, NONE, sameQuestions, siteOf, sortRows, verticalOf } from "./src/formscompute.ts";
 import type { Filters, FormsPayload } from "./src/formscompute.ts";
 
 const data: LeadsData = JSON.parse(
@@ -120,6 +120,14 @@ const A = fv.rows.find((r) => r.id === "goBWA_cl_a")!;
 const B = fv.rows.find((r) => r.id === "goASH_cl_b")!;
 check("forms: site code", siteOf("goBWA_cl_compareb"), "BWA");
 check("forms: site code (news subdomain)", siteOf("newsAHC_cl_compare"), "AHC");
+check("forms: energy site codes", `${siteOf("goEPA_cl_energyv2")} ${siteOf("EPA_cl_postcode")}`, "EPA EPA");
+check("forms: verticals", `${verticalOf("goEPA_cl_energyv2")} ${verticalOf("EPA_cl_postcode")} ${verticalOf("goASH_cl_compare")}`, "ed ed hd");
+const fpE: FormsPayload = { ...fp, forms: [...fp.forms, { id: "goEPA_cl_e", path: "/energy-v2" }], groups: [...fp.groups,
+  { f: "goEPA_cl_e", d: "2026-10-09", dev: "mobile", src: "fb", camp: "c9", ad: "ad9", v: 8, l: 2, s: { postcode: [8, 2, 1], lead: [6, 4, 2] } }] };
+check("forms: health view leaves energy out", buildFormsView(fpE, all).rows.map((r) => r.id).sort().join(), "goASH_cl_b,goBWA_cl_a");
+const eRows = buildFormsView(fpE, { ...all, vertical: "ed" }).rows;
+check("forms: energy view", eRows.map((r) => `${r.id}:${r.views}/${r.leads}`).join(), "goEPA_cl_e:8/2");
+check("forms: energy page link", eRows[0].url, "https://go.energyplanaustralia.com/energy-v2");
 check("forms: A name from page path", A.name, "a");
 check("forms: B name falls back to id", B.name, "goASH_cl_b");
 check("forms: A page link", A.url, "https://go.budgetwiseaustralia.com/a");
