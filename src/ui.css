@@ -931,8 +931,53 @@ body.is-forms {
   color: var(--ff-text-2);
 }
 
-.ff-field select {
+.ff-combo {
+  position: relative;
   width: 230px;
+  display: flex;
+}
+
+.ff-combo input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 28px 0 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ff-text);
+  background: var(--ff-surface);
+  border: 1px solid var(--ff-border);
+  border-radius: 8px;
+}
+
+.ff-combo input::placeholder {
+  color: var(--ff-muted);
+}
+
+.ff-combo.active input {
+  border-color: var(--ff-accent);
+  box-shadow: 0 0 0 1px var(--ff-accent);
+}
+
+.ff-combo__x {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ff-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ff-combo__x:hover {
+  background: var(--ff-chip);
 }
 
 .ff-panel__done {
@@ -1837,10 +1882,13 @@ body.is-forms {
     font-size: 14px;
   }
 
-  .ff-field select {
-    width: 62%;
+  .ff-combo {
+    width: 66%;
+  }
+
+  .ff-combo input {
     height: 44px;
-    font-size: 15px;
+    font-size: 16px; /* 16px stops iOS zooming in on focus */
   }
 
   .ff-panel__done {

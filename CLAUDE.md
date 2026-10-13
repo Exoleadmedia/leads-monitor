@@ -163,7 +163,10 @@ campaign and ad (each list only shows what's under the choice before it).
   covers; Δ then compares with the same number of days just before) and one
   **Filters** button (site, device, traffic source/campaign/ad) that opens a
   dropdown panel on desktop and a bottom sheet on phones. The line under the
-  numbers summarises the active filters.
+  numbers summarises the active filters. Source, Campaign and Ad are type-or-paste
+  boxes (per Kevin, 2026-10-13: paste an ad or campaign ID copied from
+  Facebook) with the period's values as suggestions; a value with no visits is
+  kept and the page says nothing matched.
 - **Desktop rows open on click** into a detail panel: the funnel as bars down to
   "Lead saved", the biggest leak in words, and the form's split by device and
   its top 4 traffic sources, each with completion (`formDetail()` in

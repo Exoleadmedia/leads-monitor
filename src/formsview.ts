@@ -184,9 +184,12 @@ function draw(): void {
   // ---- Filter panel (desktop dropdown / phone bottom sheet) -------------
   const chip = (attr: string, v: string, t: string, on: boolean) =>
     `<button type="button" class="ff-chip${on ? " on" : ""}" ${attr}="${esc(v)}" aria-pressed="${on}">${esc(t)}</button>`;
-  const select = (name: string, all: string, cur: string, opts: string[]) =>
-    `<select data-f="${name}" class="${cur ? "active" : ""}" aria-label="${esc(all)}"><option value="">${esc(all)}</option>${opts
-      .map((v) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>`;
+  // Traffic boxes: type or paste a value (e.g. a Facebook ad ID), or pick one
+  // of the values seen in this period from the suggestion list.
+  const combo = (name: string, all: string, cur: string, opts: string[]) =>
+    `<span class="ff-combo${cur ? " active" : ""}"><input type="text" data-t="${name}" list="ff-dl-${name}" value="${esc(cur)}" placeholder="${esc(all)} · paste an ID" aria-label="${esc(all)}" autocomplete="off" autocapitalize="off" spellcheck="false">${
+      cur ? `<button type="button" class="ff-combo__x" data-tclear="${name}" aria-label="Clear">×</button>` : ""
+    }<datalist id="ff-dl-${name}">${opts.map((v) => `<option value="${esc(v)}"></option>`).join("")}</datalist></span>`;
   const panel = panelOpen ? `
     <div class="ff-panel-wrap">
       <button type="button" class="ff-panel-backdrop" data-close aria-label="Close filters"></button>
@@ -195,9 +198,9 @@ function draw(): void {
         <div class="ff-panel__group"><span class="ff-panel__label">Site</span><div class="ff-chips">${chip("data-site", "", "All sites", !filters.site)}${sites.map((x) => chip("data-site", x, SITE_NAMES[x] ?? x, filters.site === x)).join("")}</div></div>
         <div class="ff-panel__group"><span class="ff-panel__label">Device</span><div class="ff-chips">${chip("data-device", "", "All devices", !filters.device)}${chip("data-device", "mobile", "Mobile", filters.device === "mobile")}${chip("data-device", "desktop", "Desktop", filters.device === "desktop")}</div></div>
         <div class="ff-panel__group"><span class="ff-panel__label">Traffic</span>
-          <label class="ff-field"><span>Source</span>${select("src", "All sources", filters.src, view.options.src)}</label>
-          <label class="ff-field"><span>Campaign</span>${select("camp", "All campaigns", filters.camp, view.options.camp)}</label>
-          <label class="ff-field"><span>Ad</span>${select("ad", "All ads", filters.ad, view.options.ad)}</label>
+          <label class="ff-field"><span>Source</span>${combo("src", "All sources", filters.src, view.options.src)}</label>
+          <label class="ff-field"><span>Campaign</span>${combo("camp", "All campaigns", filters.camp, view.options.camp)}</label>
+          <label class="ff-field"><span>Ad</span>${combo("ad", "All ads", filters.ad, view.options.ad)}</label>
         </div>
         <div class="ff-panel__group ff-phone"><span class="ff-panel__label">Strip shows</span><div class="ff-chips">${chip("data-mode", "reach", "% reached", mode !== "drop")}${chip("data-mode", "drop", "Drop-off", mode === "drop")}</div></div>
         <button type="button" class="ff-panel__done" data-close>Show ${plural(rows.length, "form")}</button>
@@ -331,7 +334,7 @@ function draw(): void {
     <div class="forms">
       ${band}
       ${panel}
-      ${rows.length ? desktop + cards : `<div class="ff-card"><p class="ff-empty">No form visits in ${esc(periodText)}${filtered ? " with these filters" : ""}.</p></div>`}
+      ${rows.length ? desktop + cards : `<div class="ff-card"><p class="ff-empty">No form visits in ${esc(periodText)}${filtered ? " with these filters" : ""}.${traffic ? " If you pasted an ID, check it matches the ad or campaign exactly, or widen the dates." : ""}</p></div>`}
       <p class="ff-notes">"Leads" = leads saved in the leads database (counted only once the save succeeds, on every form). "Completion" = leads ÷ page views. Conditional questions (e.g. Insurer, only asked to people who have insurance) are measured against the people who were actually shown them. Days are Sydney time; test visits on preview links are excluded.</p>
       <div class="ff-tip" id="ff-tip"></div>
     </div>`;
@@ -372,14 +375,21 @@ function wire(rows: FormRow[], label: (k: string) => string): void {
   on("[data-site]", "click", (el) => { filters = { ...filters, site: el.dataset.site ?? "" }; draw(); });
   on("[data-device]", "click", (el) => { filters = { ...filters, device: el.dataset.device ?? "" }; draw(); });
   on("[data-mode]", "click", (el) => { mode = el.dataset.mode as Mode; draw(); });
-  on("select[data-f]", "change", (el) => {
-    const k = el.dataset.f as keyof Filters;
-    filters = { ...filters, [k]: (el as HTMLSelectElement).value };
+  const setTraffic = (k: "src" | "camp" | "ad", raw: string) => {
+    const v = raw.trim();
+    if (v === (filters[k] ?? "")) return;
+    filters = { ...filters, [k]: v };
     // A new source or campaign resets the choices under it.
     if (k === "src") filters.camp = filters.ad = "";
     if (k === "camp") filters.ad = "";
     draw();
+  };
+  // Applies on Enter, on leaving the box, or on picking a suggestion.
+  on("input[data-t]", "change", (el) => setTraffic(el.dataset.t as "src" | "camp" | "ad", (el as HTMLInputElement).value));
+  on("input[data-t]", "keydown", (el, e) => {
+    if ((e as KeyboardEvent).key === "Enter") setTraffic(el.dataset.t as "src" | "camp" | "ad", (el as HTMLInputElement).value);
   });
+  on("[data-tclear]", "click", (el) => setTraffic(el.dataset.tclear as "src" | "camp" | "ad", ""));
   on("select[data-sort]", "change", (el) => { sort = (el as HTMLSelectElement).value as SortKey; draw(); });
   on("th[data-k]", "click", (el) => { sort = el.dataset.k as SortKey; draw(); });
   // Desktop rows open into their detail panel (the open-page arrow still just opens the page).

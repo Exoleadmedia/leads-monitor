@@ -221,17 +221,16 @@ export function buildFormsView(p: FormsPayload, filters: Filters): FormsView {
   const f = { ...filters };
   const { from, to, prevFrom, prevTo } = periodOf(p, f);
 
-  // Traffic dropdowns, each limited to what's under the choice before it.
+  // Traffic suggestions, each limited to what's under the choice before it.
+  // A typed or pasted value is kept even when nothing matches it (the page then
+  // says so), so a Facebook ad or campaign ID can be checked as-is.
   const base = inWindow(p, f, from, to);
   const uniq = (a: string[]) => [...new Set(a)].sort((x, y) => x.localeCompare(y));
   const src = uniq(base.map((g) => trafficValue(g.src)));
-  if (f.src && !src.includes(f.src)) f.src = "";
   const bySrc = base.filter((g) => !f.src || trafficValue(g.src) === f.src);
   const camp = uniq(bySrc.map((g) => trafficValue(g.camp)));
-  if (f.camp && !camp.includes(f.camp)) f.camp = "";
   const byCamp = bySrc.filter((g) => !f.camp || trafficValue(g.camp) === f.camp);
   const ad = uniq(byCamp.map((g) => trafficValue(g.ad)));
-  if (f.ad && !ad.includes(f.ad)) f.ad = "";
 
   const cur = totalsByForm(base.filter((g) => matchesTraffic(g, f)));
   const prev = totalsByForm(inWindow(p, f, prevFrom, prevTo).filter((g) => matchesTraffic(g, f)));
