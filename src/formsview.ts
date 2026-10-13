@@ -31,6 +31,12 @@ let filters: Filters = { range: 7, site: "", device: "", src: "", camp: "", ad: 
 let mode: Mode = "reach";
 let sort: SortKey = "comp";
 let panelOpen = false; // filter panel (desktop dropdown, phone bottom sheet)
+// Compare mode (desktop): tick up to 3 forms to see them side by side.
+let compareOn = false;
+let picked: string[] = [];
+let cmpMode: "reach" | "continue" = "reach"; // per Kevin: % of visitors reached by default
+const MAX_PICK = 3;
+const PICK_COLORS = ["#2a78d6", "#e07b26", "#7a4fc9"];
 const openRows = new Set<string>(); // forms whose detail is open (table rows and phone cards)
 
 /** Header pill state for the Forms tab. */
@@ -269,8 +275,8 @@ function draw(): void {
         ${breakdown("Top traffic sources", d.sources)}
       </div></td></tr>`;
     }
-    return `<tr class="ff-row${open ? " is-open" : ""}" data-id="${esc(r.id)}" aria-expanded="${open}">
-      <td class="form l" title="${esc(r.name)}"><div class="ff-formcell"><span class="ff-chev" aria-hidden="true">${open ? "▾" : "▸"}</span><span class="ff-site">${esc(r.site)}</span><span class="ff-fname ff-fname--full">${esc(r.name)}</span>${openLink(r)}</div></td>
+    return `<tr class="ff-row${open ? " is-open" : ""}${compareOn && picked.includes(r.id) ? " is-picked" : ""}" data-id="${esc(r.id)}" aria-expanded="${open}">
+      <td class="form l" title="${esc(r.name)}"><div class="ff-formcell">${compareOn ? pickBox(r) : ""}<span class="ff-chev" aria-hidden="true">${open ? "▾" : "▸"}</span>${pickDot(r.id)}<span class="ff-site">${esc(r.site)}</span><span class="ff-fname ff-fname--full">${esc(r.name)}</span>${openLink(r)}</div></td>
       <td>${int(r.views)}</td>${cells}
       <td class="cell"><div class="ff-hm ff-hm--comp" style="${cellStyle(r.comp)}">${pct(r.comp)}${simple ? "" : "<small>Completion</small>"}</div></td>
       <td>${int(r.leads)}</td>
@@ -282,10 +288,12 @@ function draw(): void {
   const modeBtn = (v: Mode, t: string) => `<button type="button" data-mode="${v}" class="${mode === v ? "on" : ""}" aria-pressed="${mode === v}">${t}</button>`;
   const badge = byQ ? "Compare by question" : simple ? "Same questions on every form" : "Forms differ: names inside cells";
 
+  const shownPicks = picked.filter((id) => rows.some((r) => r.id === id));
   const desktop = `
     <div class="ff-tablebar ff-desktop">
       <div class="ff-seg">${modeBtn("reach", "% reached")}${modeBtn("drop", "Drop-off per step")}${modeBtn("question", "Compare by question")}</div>
-      <span class="ff-tablebar__help"><span class="ff-layout${simple ? " is-simple" : ""}">${badge}</span> ${HELP[mode]} Click a row for details, a header to sort.</span>
+      <span class="ff-tablebar__help"><span class="ff-layout${simple ? " is-simple" : ""}">${badge}</span> ${compareOn ? "Tick 2 or 3 forms to compare them below." : `${HELP[mode]} Click a row for details, a header to sort.`}</span>
+      <button type="button" class="ff-cmpbtn${compareOn ? " on" : ""}" data-compare aria-pressed="${compareOn}">${compareOn ? "Comparing · pick up to 3" : "Compare forms"}</button>
     </div>
     <div class="ff-card ff-desktop">
       <div class="ff-scroll"><table class="ff-table">${colgroup}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>
@@ -295,7 +303,11 @@ function draw(): void {
         <span>Grey = form doesn't have that ${byQ ? "question" : "many questions"}</span>
         <span>Δ = completion vs the ${esc(prevText)}, in points</span>
       </div>
-    </div>`;
+    </div>
+    ${compareOn ? compareHtml(rows, shownPicks, label, Object.keys(p.labels), periodText) : ""}
+    ${compareOn ? `<div class="ff-tray ff-desktop"><div class="ff-tray__in"><span>${shownPicks.length} of ${MAX_PICK} forms selected</span>${
+      shownPicks.length >= 2 ? `<a class="ff-tray__go" href="#ff-compare">See comparison ↓</a>` : ""
+    }<button type="button" class="ff-tray__done" data-compare>Done</button></div></div>` : ""}`;
 
   // ---- Phone cards (design D) ---------------------------------------------
   const sortOpts: [SortKey, string][] = [["comp", "by completion"], ["views", "by views"], ["leads", "by leads"], ["delta", "by change"], ["name", "by name"]];
@@ -393,8 +405,17 @@ function wire(rows: FormRow[], label: (k: string) => string): void {
   on("select[data-sort]", "change", (el) => { sort = (el as HTMLSelectElement).value as SortKey; draw(); });
   on("th[data-k]", "click", (el) => { sort = el.dataset.k as SortKey; draw(); });
   // Desktop rows open into their detail panel (the open-page arrow still just opens the page).
+  on("[data-compare]", "click", () => { compareOn = !compareOn; draw(); });
+  on("input[data-pick]", "change", (el) => {
+    const id = el.dataset.pick ?? "";
+    if (picked.includes(id)) picked = picked.filter((x) => x !== id);
+    else if (picked.length < MAX_PICK) picked = [...picked, id];
+    draw();
+  });
+  on("[data-cmpmode]", "click", (el) => { cmpMode = el.dataset.cmpmode as "reach" | "continue"; draw(); });
+  on("[data-cmpclear]", "click", () => { picked = []; draw(); });
   on("tr.ff-row", "click", (el, e) => {
-    if ((e.target as HTMLElement).closest("a")) return;
+    if ((e.target as HTMLElement).closest("a, label, input")) return;
     const id = el.dataset.id ?? "";
     if (openRows.has(id)) openRows.delete(id);
     else openRows.add(id);
@@ -428,6 +449,105 @@ function wire(rows: FormRow[], label: (k: string) => string): void {
     });
     el.addEventListener("mouseleave", () => (tip.style.opacity = "0"));
   });
+}
+
+function pickBox(r: FormRow): string {
+  const on = picked.includes(r.id);
+  const full = !on && picked.length >= MAX_PICK;
+  const title = on ? `Remove ${r.name} from the comparison` : full ? `Up to ${MAX_PICK} forms` : `Add ${r.name} to the comparison`;
+  return `<label class="ff-pick" title="${esc(title)}"><input type="checkbox" data-pick="${esc(r.id)}"${on ? " checked" : ""}${full ? " disabled" : ""} aria-label="${esc(title)}"></label>`;
+}
+
+function pickDot(id: string): string {
+  const i = compareOn ? picked.indexOf(id) : -1;
+  return i < 0 ? "" : `<span class="ff-pdot" style="background:${PICK_COLORS[i]}" aria-hidden="true"></span>`;
+}
+
+/**
+ * Side-by-side comparison of 2 or 3 forms (design: "Desktop · compare forms" on
+ * the mobile options canvas). Completion is the verdict; then every question,
+ * lined up by question rather than position, with the best value in green and
+ * the weakest in red.
+ */
+function compareHtml(rows: FormRow[], ids: string[], label: (k: string) => string, keyOrder: string[], periodText: string): string {
+  if (ids.length < 2) {
+    return `<section class="ff-cmp-hint ff-desktop">${ids.length ? "Tick one more form to start the comparison." : "Tick 2 or 3 forms in the table to see them side by side here."}</section>`;
+  }
+  const forms = ids.map((id) => rows.find((r) => r.id === id) as FormRow);
+  const color = (f: FormRow) => PICK_COLORS[picked.indexOf(f.id)];
+  const dot = (f: FormRow) => `<span class="ff-pdot" style="background:${color(f)}" aria-hidden="true"></span>`;
+  const r1 = (x: number) => Math.round(x * 1000) / 10; // fraction -> % with one decimal
+  const n = forms.length;
+  const cols = `190px repeat(${n}, minmax(0, 1fr)) 260px`;
+
+  // Verdict: completion.
+  const comps = forms.map((f) => r1(f.comp));
+  const best = Math.max(...comps);
+  const tie = comps.filter((c) => c === best).length > 1;
+  const second = [...comps].sort((a, b) => b - a)[1];
+  const verdicts = forms.map((f, j) => {
+    const isBest = !tie && comps[j] === best;
+    const gap = isBest
+      ? `+${(best - second).toFixed(1)} pts${second > 0 ? ` · ${(best / second).toFixed(1)}× the next form` : ""}`
+      : best - comps[j] > 0 ? `${(best - comps[j]).toFixed(1)} pts behind` : "";
+    return `<div class="ff-verdict${isBest ? " is-best" : ""}">
+      <div class="ff-verdict__head"><span class="ff-verdict__name">${dot(f)}<span class="ff-site">${esc(f.site)}</span>${esc(f.name)}</span>${isBest ? `<span class="ff-verdict__badge">Best completion</span>` : tie && comps[j] === best ? `<span class="ff-verdict__tie">Tied</span>` : ""}</div>
+      <div class="ff-verdict__big"><span>${pct(f.comp)}</span> completion</div>
+      <span class="ff-verdict__bar"><i style="width:${best ? Math.max(2, (comps[j] / best) * 100) : 0}%"></i></span>
+      <div class="ff-verdict__foot"><span>${int(f.leads)} leads from ${int(f.views)} views</span><span class="${isBest ? "ff-good" : "ff-bad"}">${gap}</span></div>
+    </div>`;
+  }).join("");
+
+  // Step by step, lined up by question.
+  const order = [...new Set([...keyOrder, ...forms.flatMap((f) => f.qs)])].filter((k) => k !== "lead");
+  const keys = [...order.filter((k) => forms.some((f) => f.qs.includes(k))), "lead"];
+  const wins = forms.map(() => 0);
+  const value = (f: FormRow, i: number): number | null =>
+    cmpMode === "reach" ? f.reach[i] : f.quit[i] == null ? null : 1 - (f.quit[i] as number);
+  const row = (name: string, vals: (number | null)[], pos: string[], total: boolean, someOnly: boolean): string => {
+    const pcts = vals.map((v) => (v == null ? null : r1(v)));
+    const ok = pcts.filter((v): v is number => v != null);
+    const hi = ok.length >= 2 ? Math.max(...ok) : null;
+    const lo = ok.length >= 2 ? Math.min(...ok) : null;
+    const winner = hi != null && lo != null && hi - lo >= 0.5 && pcts.filter((v) => v === hi).length === 1 ? pcts.indexOf(hi) : -1;
+    if (winner >= 0 && !total) wins[winner]++;
+    const gap = winner >= 0 ? (hi as number) - (lo as number) : 0;
+    const cells = pcts.map((v, j) => {
+      if (v == null) return `<span class="ff-ccell is-na">Not asked</span>`;
+      const cls = j === winner ? " is-win" : winner >= 0 && v === lo ? " is-low" : "";
+      return `<span class="ff-ccell${cls}"><span class="ff-ccell__v">${pct((vals[j] as number))}</span><span class="ff-ccell__p">${esc(pos[j])}</span></span>`;
+    }).join("");
+    const lead = winner >= 0
+      ? `<span class="ff-gap__bar"><i style="width:${Math.min(100, gap * 3)}%"></i></span><span class="ff-gap__t ff-good">${dot(forms[winner])}+${gap.toFixed(1)} pts</span>`
+      : `<span class="ff-gap__bar"></span><span class="ff-gap__t">${ok.length >= 2 ? "Level" : ""}</span>`;
+    return `<div class="ff-crow${total ? " is-total" : ""}" style="grid-template-columns:${cols}"><span class="ff-crow__l">${esc(name)}${someOnly ? " *" : ""}</span>${cells}<span class="ff-gap">${lead}</span></div>`;
+  };
+  const steps = keys.map((k) => {
+    const idx = forms.map((f) => f.qs.indexOf(k));
+    return row(
+      label(k),
+      forms.map((f, j) => (idx[j] < 0 ? null : value(f, idx[j]))),
+      forms.map((_, j) => (idx[j] < 0 ? "" : k === "lead" ? "last" : `#${idx[j] + 1}`)),
+      false,
+      idx.some((i) => i < 0),
+    );
+  }).join("") + row("Completion", forms.map((f) => f.comp), forms.map(() => "leads ÷ views"), true, false);
+  const score = forms.map((f, j) => `<span class="ff-score">${dot(f)}${esc(f.name)} leads on ${wins[j]} ${wins[j] === 1 ? "step" : "steps"}</span>`).join("");
+  const modeBtn = (v: "reach" | "continue", t: string) => `<button type="button" data-cmpmode="${v}" class="${cmpMode === v ? "on" : ""}" aria-pressed="${cmpMode === v}">${t}</button>`;
+
+  return `<section class="ff-compare ff-desktop" id="ff-compare">
+    <div class="ff-compare__head"><div><h2>Comparing ${n} forms</h2><span>${esc(periodText.charAt(0).toUpperCase() + periodText.slice(1))} · same filters as the table</span></div><button type="button" class="ff-link" data-cmpclear>Clear</button></div>
+    <div class="ff-verdicts" style="grid-template-columns:repeat(${n}, minmax(0, 1fr))">${verdicts}</div>
+    <div class="ff-compare__bar">
+      <div class="ff-compare__score"><h3>Step by step</h3>${score}</div>
+      <div class="ff-seg">${modeBtn("reach", "% of visitors reached")}${modeBtn("continue", "Continued past each step")}</div>
+    </div>
+    <p class="ff-compare__help">${cmpMode === "reach" ? "Share of all visitors who got as far as each question; early losses carry through to later steps." : "Of the people shown each question, the share who went on (contact form: who became a lead), so every step is judged on its own."} Green = best on that step, red = weakest. * = not asked on every form.</p>
+    <div class="ff-ctable">
+      <div class="ff-crow is-head" style="grid-template-columns:${cols}"><span>Question</span>${forms.map((f) => `<span class="ff-ccol">${dot(f)}<span>${esc(f.name)}</span></span>`).join("")}<span>Who leads, by how much</span></div>
+      ${steps}
+    </div>
+  </section>`;
 }
 
 function esc(s: string): string {

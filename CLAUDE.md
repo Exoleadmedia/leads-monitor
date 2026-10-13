@@ -171,6 +171,16 @@ campaign and ad (each list only shows what's under the choice before it).
   "Lead saved", the biggest leak in words, and the form's split by device and
   its top 4 traffic sources, each with completion (`formDetail()` in
   `formscompute.ts`).
+- **Compare forms** (desktop, per Kevin 2026-10-13): the button above the table
+  adds tick boxes (up to 3; each picked form gets a coloured dot) and a bottom
+  tray. With 2-3 ticked, a section under the table shows completion as the
+  verdict (best form in green, gap in points and ×), a scoreboard of steps
+  won, and every question lined up by question, not position ("Not asked"
+  where a form skips it), best value green and weakest red, ending with
+  Completion. Default view is % of visitors reached; "Continued past each
+  step" uses 1 − quit for each step (exact per-step counts). Green always
+  means better; form colours are only the dots. Design: "Desktop · compare
+  forms" on the mockups canvas. Compare state resets on reload.
 - **Phones** follow design D: the band edge to edge, then one card per form
   (name, completion, a strip with one block per question, leak) that opens
   into the same funnel bars and an "Open page" button. Mockups:
