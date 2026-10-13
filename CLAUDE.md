@@ -157,6 +157,21 @@ campaign and ad (each list only shows what's under the choice before it).
 
 - Its own page (see above); data refreshes every 5 minutes, on refresh and
   when the page becomes visible again.
+- **Top band** (per Kevin, 2026-10-13, from mobile design "D"): navy band with
+  the period's completion %, views and leads, the date switch (Today, 7 days,
+  30 days, **Custom** with From/To pickers limited to the 60 days the feed
+  covers; Δ then compares with the same number of days just before) and one
+  **Filters** button (site, device, traffic source/campaign/ad) that opens a
+  dropdown panel on desktop and a bottom sheet on phones. The line under the
+  numbers summarises the active filters.
+- **Desktop rows open on click** into a detail panel: the funnel as bars down to
+  "Lead saved", the biggest leak in words, and the form's split by device and
+  its top 4 traffic sources, each with completion (`formDetail()` in
+  `formscompute.ts`).
+- **Phones** follow design D: the band edge to edge, then one card per form
+  (name, completion, a strip with one block per question, leak) that opens
+  into the same funnel bars and an "Open page" button. Mockups:
+  https://claude.ai/artifact/2krwqxPb48U3ErqjxyXmWh
 - Table columns: Form, Views, one per question, Contact form, **Completion**
   (leads ÷ views, as a blue cell like the questions so the last drop-off reads
   the same way), Leads, Δ. "Started" was removed 2026-10-13 per Kevin (it
@@ -171,12 +186,8 @@ campaign and ad (each list only shows what's under the choice before it).
   separate from the dashboard's own tokens. It's read mostly on desktop, so the
   tab uses the full window width; question columns share the spare width
   equally (`table-layout: fixed` + `<colgroup>`). Phones scroll the table.
-- **Phones (≤700px)** get their own layout (Kevin, 2026-10-09: the squeezed
-  desktop view was "horrible"): one card per form instead of the table (stats,
-  a coloured strip with a block per question, tap to open the question list),
-  a "Sort by" select instead of column headers, traffic filters behind a
-  button, short mode labels, no help paragraph. Both layouts are rendered;
-  CSS shows one (`.ff-desktop` / `.ff-phone`).
+- Both layouts are rendered; CSS shows one (`.ff-desktop` / `.ff-phone`, phones
+  ≤700px). Phones sort with a select instead of column headers.
 - **Biggest leak** (red outline) needs at least 10 people shown the question.
 - Form names are the page path; the site badge comes from the `_c_dt` prefix
   (`goBWA_...` is BWA, `newsAHC_...` is AHC). Add new site codes to

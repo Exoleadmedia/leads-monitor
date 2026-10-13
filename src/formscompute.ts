@@ -18,6 +18,7 @@ export interface FormsGroup {
 export interface FormsPayload {
   syncedAt: string;
   today: string; // "YYYY-MM-DD", Sydney
+  since?: string; // first day the payload covers (custom range lower bound)
   labels: Record<string, string>; // question key -> display label
   forms: { id: string; path: string | null }[];
   groups: FormsGroup[];
@@ -33,6 +34,7 @@ export function validateForms(raw: unknown): FormsPayload {
   return {
     syncedAt: typeof d.syncedAt === "string" ? d.syncedAt : new Date().toISOString(),
     today: d.today,
+    since: typeof d.since === "string" ? d.since : undefined,
     labels: (d.labels && typeof d.labels === "object" ? d.labels : {}) as Record<string, string>,
     forms: d.forms as FormsPayload["forms"],
     groups: d.groups as FormsGroup[],
@@ -48,10 +50,12 @@ export function validateForms(raw: unknown): FormsPayload {
 export const NONE = "(none)";
 
 export type Mode = "reach" | "drop" | "question";
-export type SortKey = "name" | "views" | "started" | "comp" | "leads" | "delta";
+export type SortKey = "name" | "views" | "comp" | "leads" | "delta";
 
 export interface Filters {
-  range: number; // days, ending today (1, 7 or 30)
+  range: number; // days ending today (1, 7 or 30); 0 = custom from/to
+  from?: string; // custom range start, "YYYY-MM-DD" (Sydney day)
+  to?: string; // custom range end, inclusive
   site: string; // "" = all
   device: string; // "" = all, "mobile", "desktop"
   src: string; // "" = all, NONE = no utm_source
@@ -67,7 +71,6 @@ export interface FormRow {
   views: number;
   leads: number;
   comp: number; // leads / views
-  started: number | null; // share of views shown the second question
   qs: string[]; // question keys in this form's order, "lead" last
   shown: number[]; // sessions shown each question
   dropped: number[]; // sessions whose last question was this one (no submit)
@@ -188,16 +191,38 @@ export interface FormsView {
   filters: Filters; // with traffic selections that no longer exist cleared
 }
 
+/** Days between two "YYYY-MM-DD" dates, inclusive of both. */
+function spanDays(from: string, to: string): number {
+  const ms = (d: string) => {
+    const [y, m, day] = d.split("-").map(Number);
+    return Date.UTC(y, m - 1, day);
+  };
+  return Math.round((ms(to) - ms(from)) / 864e5) + 1;
+}
+
+/**
+ * The selected period and the one just before it, the same length. A custom
+ * range with its ends swapped is read the right way round.
+ */
+export function periodOf(p: FormsPayload, f: Filters): { from: string; to: string; prevFrom: string; prevTo: string; days: number } {
+  let from: string, to: string;
+  if (f.range === 0 && f.from && f.to) {
+    [from, to] = f.from <= f.to ? [f.from, f.to] : [f.to, f.from];
+  } else {
+    to = p.today;
+    from = addDays(p.today, -(Math.max(1, f.range) - 1));
+  }
+  const days = spanDays(from, to);
+  return { from, to, prevFrom: addDays(from, -days), prevTo: addDays(from, -1), days };
+}
+
 /** Everything the Forms tab shows for the given filters. */
 export function buildFormsView(p: FormsPayload, filters: Filters): FormsView {
   const f = { ...filters };
-  const n = Math.max(1, f.range);
-  const from = addDays(p.today, -(n - 1));
-  const prevFrom = addDays(p.today, -(2 * n - 1));
-  const prevTo = addDays(p.today, -n);
+  const { from, to, prevFrom, prevTo } = periodOf(p, f);
 
   // Traffic dropdowns, each limited to what's under the choice before it.
-  const base = inWindow(p, f, from, p.today);
+  const base = inWindow(p, f, from, to);
   const uniq = (a: string[]) => [...new Set(a)].sort((x, y) => x.localeCompare(y));
   const src = uniq(base.map((g) => trafficValue(g.src)));
   if (f.src && !src.includes(f.src)) f.src = "";
@@ -241,7 +266,6 @@ export function buildFormsView(p: FormsPayload, filters: Filters): FormsView {
       views: t.views,
       leads: t.leads,
       comp,
-      started: qs.length > 1 ? shown[1] / t.views : null,
       qs,
       shown,
       dropped,
@@ -263,7 +287,6 @@ export function buildFormsView(p: FormsPayload, filters: Filters): FormsView {
 export function sortRows(rows: FormRow[], key: SortKey): FormRow[] {
   const val = (r: FormRow): number =>
     key === "views" ? r.views
-    : key === "started" ? r.started ?? -1
     : key === "leads" ? r.leads
     : key === "delta" ? r.delta ?? -Infinity
     : r.comp;
@@ -276,3 +299,39 @@ export function sortRows(rows: FormRow[], key: SortKey): FormRow[] {
 export function sameQuestions(rows: FormRow[]): boolean {
   return rows.length > 0 && rows.every((r) => r.qs.join() === rows[0].qs.join());
 }
+
+export interface Breakdown {
+  label: string;
+  views: number;
+  leads: number;
+  comp: number; // leads / views
+}
+
+/**
+ * Extra detail for one form in the selected period: its traffic split by
+ * device (ignoring the device filter) and its top traffic sources (ignoring the
+ * traffic filters), each with completion. Other filters still apply.
+ */
+export function formDetail(p: FormsPayload, f: Filters, formId: string): { devices: Breakdown[]; sources: Breakdown[] } {
+  const { from, to } = periodOf(p, f);
+  const mine = p.groups.filter((g) => g.f === formId && g.d >= from && g.d <= to && (!f.site || siteOf(g.f) === f.site));
+  const sum = (groups: FormsGroup[], key: (g: FormsGroup) => string): Breakdown[] => {
+    const m = new Map<string, Breakdown>();
+    for (const g of groups) {
+      const k = key(g);
+      const b = m.get(k) ?? { label: k, views: 0, leads: 0, comp: 0 };
+      b.views += g.v;
+      b.leads += g.l;
+      m.set(k, b);
+    }
+    return [...m.values()]
+      .map((b) => ({ ...b, comp: b.views ? b.leads / b.views : 0 }))
+      .sort((a, b) => b.views - a.views);
+  };
+  const devLabel = (d: string | null) => (d === "mobile" ? "Mobile" : d === "desktop" ? "Desktop" : "Unknown");
+  return {
+    devices: sum(mine.filter((g) => matchesTraffic(g, f)), (g) => devLabel(g.dev)),
+    sources: sum(mine.filter((g) => !f.device || g.dev === f.device), (g) => trafficValue(g.src)).slice(0, 4),
+  };
+}
+

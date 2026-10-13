@@ -15,7 +15,7 @@ import {
   typicalLine,
 } from "./src/compute.ts";
 import type { LeadsData } from "./src/types.ts";
-import { buildFormsView, NONE, sameQuestions, siteOf, sortRows } from "./src/formscompute.ts";
+import { buildFormsView, formDetail, NONE, sameQuestions, siteOf, sortRows } from "./src/formscompute.ts";
 import type { Filters, FormsPayload } from "./src/formscompute.ts";
 
 const data: LeadsData = JSON.parse(
@@ -128,7 +128,6 @@ check("forms: A question order (insurer before coverFor)", A.qs.join(), "over60,
 check("forms: A views/leads (7 days)", `${A.views}/${A.leads}`, "14/3");
 check("forms: A shown", A.shown.join(), "14,11,5,10,9");
 check("forms: A dropped", A.dropped.join(), "3,0,1,1,6");
-check("forms: A started", A.started!.toFixed(4), (11 / 14).toFixed(4));
 check("forms: A biggest leak = over60 (insurer/lead under 10 people)", A.leak, 0);
 check("forms: A change vs previous 7 days", A.delta!.toFixed(2), "-28.57");
 check("forms: B leak = contact form", B.leak, 2);
@@ -144,6 +143,13 @@ check("forms: stale campaign cleared", buildFormsView(fp, { ...all, src: NONE, c
 check("forms: site filter", buildFormsView(fp, { ...all, site: "ASH" }).rows.map((r) => r.id).join(), "goASH_cl_b");
 check("forms: desktop only", buildFormsView(fp, { ...all, device: "desktop" }).rows.map((r) => r.views).join(), "4");
 const today = buildFormsView(fp, { ...all, range: 1 }).rows.find((r) => r.id === "goBWA_cl_a")!;
+const custom = buildFormsView(fp, { ...all, range: 0, from: "2026-10-09", to: "2026-10-08" });
+const cA = custom.rows.find((r) => r.id === "goBWA_cl_a")!;
+check("forms: custom range (ends swapped) = 8-9 Oct", `${cA.views}/${cA.leads}`, "14/3");
+check("forms: custom range previous period = 6-7 Oct (no data)", cA.delta, null);
+const det = formDetail(fp, all, "goBWA_cl_a");
+check("forms: detail by device", det.devices.map((d) => `${d.label}:${d.views}/${d.leads}`).join(), "Mobile:10/2,Desktop:4/1");
+check("forms: detail top sources", det.sources.map((d) => `${d.label}:${d.views}`).join(), `fb:10,${NONE}:4`);
 check("forms: today vs yesterday", `${today.views}/${today.leads} ${today.delta!.toFixed(1)}`, "10/2 -5.0");
 
 console.log(`\n${pass} passed, ${fail} failed`);
