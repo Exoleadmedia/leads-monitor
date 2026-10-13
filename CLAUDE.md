@@ -95,7 +95,7 @@ src/
   formsview.ts    Form Performance render and interactions
 form-performance/index.html     the Form Performance page
 public/leads-sample.json    bundled fixture
-public/forms-sample.json    made up Forms tab fixture (used with no endpoint)
+public/forms-sample.json    made up Form Performance fixture (used with no endpoint)
 apps-script/Code.gs         the Sheet side endpoint
 verify.ts                   asserts all 25 spec numbers against the fixture
 ```
@@ -180,7 +180,7 @@ campaign and ad (each list only shows what's under the choice before it).
 - **Biggest leak** (red outline) needs at least 10 people shown the question.
 - Form names are the page path; the site badge comes from the `_c_dt` prefix
   (`goBWA_...` is BWA). Add new site codes to `SITE_NAMES` in `formscompute.ts`.
-- `node verify.ts` includes hand checked Forms tab cases.
+- `node verify.ts` includes hand checked form funnel cases.
 - Data volume: the payload is per day per UTM combination, paged 1000 rows at
   a time from Supabase by `/api/form-stats`. If it grows slow after the rollout to every site, add a
   pre-aggregated table or a Postgres function rather than widening the range.
